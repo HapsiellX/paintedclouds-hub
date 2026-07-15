@@ -41,7 +41,7 @@ jobs:
         run: pnpm build
 
   image:
-    if: forgejo.event_name == 'push' && forgejo.ref == 'refs/heads/main'
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: validate
     runs-on: hub-ci
     steps:
