@@ -11,6 +11,7 @@ import {
   EyeSlashIcon,
   FilmIcon,
   SparklesIcon,
+  Squares2X2Icon,
   TvIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -21,6 +22,7 @@ import {
   EyeSlashIcon as FilledEyeSlashIcon,
   FilmIcon as FilledFilmIcon,
   SparklesIcon as FilledSparklesIcon,
+  Squares2X2Icon as FilledSquares2X2Icon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
   XMarkIcon,
@@ -71,6 +73,13 @@ const MobileMenu = ({
   const toggle = () => setIsOpen(!isOpen);
 
   const menuLinks: MenuLink[] = [
+    {
+      href: '/hub',
+      content: intl.formatMessage(menuMessages.hub),
+      svgIcon: <Squares2X2Icon className="h-6 w-6" />,
+      svgIconSelected: <FilledSquares2X2Icon className="h-6 w-6" />,
+      activeRegExp: /^\/hub/,
+    },
     {
       href: '/',
       content: intl.formatMessage(menuMessages.dashboard),

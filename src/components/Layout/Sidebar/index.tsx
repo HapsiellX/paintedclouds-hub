@@ -11,6 +11,7 @@ import {
   EyeSlashIcon,
   FilmIcon,
   SparklesIcon,
+  Squares2X2Icon,
   TvIcon,
   UsersIcon,
   XMarkIcon,
@@ -23,6 +24,7 @@ import { useIntl } from 'react-intl';
 
 export const menuMessages = defineMessages('components.Layout.Sidebar', {
   dashboard: 'Discover',
+  hub: 'Hub',
   browsemovies: 'Movies',
   browsetv: 'Series',
   requests: 'Requests',
@@ -53,6 +55,12 @@ interface SidebarLinkProps {
 }
 
 const SidebarLinks: SidebarLinkProps[] = [
+  {
+    href: '/hub',
+    messagesKey: 'hub',
+    svgIcon: <Squares2X2Icon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/hub/,
+  },
   {
     href: '/',
     messagesKey: 'dashboard',

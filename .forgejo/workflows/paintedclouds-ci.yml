@@ -1,0 +1,71 @@
+name: PaintedClouds Hub CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: paintedclouds-${{ forgejo.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: hub-ci
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Enable the pinned pnpm version
+        run: corepack enable
+      - name: Install dependencies
+        env:
+          CI: 'true'
+          CYPRESS_INSTALL_BINARY: '0'
+        run: pnpm install --frozen-lockfile
+      - name: Formatting
+        run: pnpm format:check
+      - name: TypeScript
+        run: pnpm typecheck
+      - name: Unit tests
+        env:
+          CI: 'true'
+        run: pnpm test
+      - name: Production build
+        run: pnpm build
+
+  image:
+    if: forgejo.event_name == 'push' && forgejo.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: hub-ci
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configure isolated Buildx
+        uses: https://data.forgejo.org/docker/setup-buildx-action@v3
+      - name: Authenticate to the private Forgejo registry
+        uses: https://data.forgejo.org/docker/login-action@v3
+        with:
+          registry: git.paintedclouds.com
+          username: ${{ forgejo.actor }}
+          password: ${{ secrets.FORGEJO_TOKEN }}
+      - name: Build and publish immutable image
+        uses: https://data.forgejo.org/docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            git.paintedclouds.com/kardo/paintedclouds-hub:${{ forgejo.sha }}
+            git.paintedclouds.com/kardo/paintedclouds-hub:edge
+          build-args: |
+            COMMIT_TAG=${{ forgejo.sha }}
+            SOURCE_DATE_EPOCH=${{ forgejo.event.head_commit.timestamp }}
+          provenance: false

@@ -93,6 +93,23 @@ export interface MetadataProfile {
   name: string;
 }
 
+export interface LidarrArtist {
+  id?: number;
+  artistName: string;
+  foreignArtistId: string;
+  path?: string;
+  rootFolderPath: string;
+  qualityProfileId: number;
+  metadataProfileId: number;
+  monitored: boolean;
+  monitorNewItems: string;
+  tags: number[];
+  addOptions?: {
+    monitor: string;
+    searchForMissingAlbums: boolean;
+  };
+}
+
 class LidarrAPI extends ServarrBase<{ albumId: number }> {
   constructor({ url, apiKey }: { url: string; apiKey: string }) {
     super({ url, apiKey, cacheName: 'lidarr', apiName: 'Lidarr' });
@@ -108,6 +125,28 @@ class LidarrAPI extends ServarrBase<{ albumId: number }> {
         cause: e,
       });
     }
+  };
+
+  public lookupArtist = async (mbid: string): Promise<LidarrArtist> => {
+    const response = await this.axios.get<LidarrArtist[]>('/artist/lookup', {
+      params: { term: `lidarr:${mbid}` },
+    });
+    if (!response.data[0]) {
+      throw new Error('Artist not found');
+    }
+    return response.data[0];
+  };
+
+  public addArtist = async (artist: LidarrArtist): Promise<LidarrArtist> => {
+    const response = await this.axios.post<LidarrArtist>('/artist', artist);
+    if (!response.data.id) {
+      throw new Error('Lidarr did not accept the artist');
+    }
+    return response.data;
+  };
+
+  public searchArtist = async (artistId: number): Promise<void> => {
+    await this.runCommand('ArtistSearch', { artistId });
   };
 
   public async getAlbumById(id: number): Promise<LidarrAlbum> {
