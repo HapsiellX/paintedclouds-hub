@@ -49,23 +49,20 @@ jobs:
         uses: https://data.forgejo.org/actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Configure isolated Buildx
-        uses: https://data.forgejo.org/docker/setup-buildx-action@v3
+      - name: Install the Docker client
+        run: |
+          apt-get update -qq
+          apt-get install --no-install-recommends -y docker.io
       - name: Authenticate to the private Forgejo registry
-        uses: https://data.forgejo.org/docker/login-action@v3
-        with:
-          registry: git.paintedclouds.com
-          username: ${{ forgejo.actor }}
-          password: ${{ secrets.FORGEJO_TOKEN }}
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+        run: echo "$FORGEJO_TOKEN" | docker login git.paintedclouds.com --username "${{ forgejo.actor }}" --password-stdin
       - name: Build and publish immutable image
-        uses: https://data.forgejo.org/docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            git.paintedclouds.com/kardo/paintedclouds-hub:${{ forgejo.sha }}
-            git.paintedclouds.com/kardo/paintedclouds-hub:edge
-          build-args: |
-            COMMIT_TAG=${{ forgejo.sha }}
-            SOURCE_DATE_EPOCH=${{ forgejo.event.head_commit.timestamp }}
-          provenance: false
+        env:
+          DOCKER_BUILDKIT: '1'
+          IMAGE_SHA: git.paintedclouds.com/kardo/paintedclouds-hub:${{ forgejo.sha }}
+          IMAGE_EDGE: git.paintedclouds.com/kardo/paintedclouds-hub:edge
+        run: |
+          docker build --build-arg COMMIT_TAG="${{ forgejo.sha }}" --tag "$IMAGE_SHA" --tag "$IMAGE_EDGE" .
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_EDGE"
