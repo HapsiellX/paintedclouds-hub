@@ -56,9 +56,7 @@ jobs:
           apt-get update -qq
           apt-get install --no-install-recommends -y docker.io
       - name: Authenticate to the private Forgejo registry
-        env:
-          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-        run: echo "$FORGEJO_TOKEN" | docker login git.paintedclouds.com --username "${{ forgejo.actor }}" --password-stdin
+        run: echo "$HUB_REGISTRY_TOKEN" | docker login git.paintedclouds.com --username "${{ forgejo.actor }}" --password-stdin
       - name: Build and publish immutable image
         env:
           DOCKER_BUILDKIT: '1'
