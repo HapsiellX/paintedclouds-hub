@@ -44,6 +44,8 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: validate
     runs-on: hub-ci
+    env:
+      DOCKER_API_VERSION: '1.44'
     steps:
       - name: Checkout
         uses: https://data.forgejo.org/actions/checkout@v4
