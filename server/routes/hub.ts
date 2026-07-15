@@ -14,6 +14,7 @@ import {
   getHubServiceStatus,
   getStorageUsage,
 } from '@server/lib/hub/integrations';
+import { notifyHomeAssistant } from '@server/lib/hub/notifications';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { createHash } from 'crypto';
@@ -204,11 +205,20 @@ hubRoutes.post('/requests', async (req, res) => {
     autoApproved: approval.allowed,
     reason: approval.reason,
   });
+  await notifyHomeAssistant(
+    approval.allowed ? 'request_auto_approved' : 'request_pending',
+    { requestId: request.id, title: request.title, kind: request.kind }
+  );
 
   if (approval.allowed) {
     try {
       request = await repository.save(await submitHubRequest(request));
       await addAudit(request, 'submitted', user, {
+        target: request.targetService,
+      });
+      await notifyHomeAssistant('request_submitted', {
+        requestId: request.id,
+        title: request.title,
         target: request.targetService,
       });
     } catch (e) {
@@ -221,6 +231,11 @@ hubRoutes.post('/requests', async (req, res) => {
       request.errorMessage = e.message;
       request = await repository.save(request);
       await addAudit(request, 'failed', user, { message: e.message });
+      await notifyHomeAssistant('request_failed', {
+        requestId: request.id,
+        title: request.title,
+        message: e.message,
+      });
     }
   }
   return res.status(201).json(request);

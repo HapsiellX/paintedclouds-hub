@@ -32,6 +32,11 @@ function stringOrReadFileFromEnv(envVar: string): Buffer | string | undefined {
   return undefined;
 }
 
+function passwordFromEnv(envVar: string): string | undefined {
+  const value = stringOrReadFileFromEnv(envVar);
+  return Buffer.isBuffer(value) ? value.toString('utf8').trim() : value;
+}
+
 function buildSslConfig(): TlsOptions | undefined {
   if (process.env.DB_USE_SSL?.toLowerCase() !== 'true') {
     return undefined;
@@ -93,7 +98,7 @@ const postgresDevConfig: DataSourceOptions = {
     ? undefined
     : parseInt(process.env.DB_PORT ?? '5432'),
   username: process.env.DB_USER,
-  password: process.env.DB_PASS,
+  password: passwordFromEnv('DB_PASS'),
   database: process.env.DB_NAME ?? 'seerr',
   ssl: buildSslConfig(),
   poolSize: intFromEnv('DB_POOL_SIZE'),
@@ -112,7 +117,7 @@ const postgresProdConfig: DataSourceOptions = {
     ? undefined
     : parseInt(process.env.DB_PORT ?? '5432'),
   username: process.env.DB_USER,
-  password: process.env.DB_PASS,
+  password: passwordFromEnv('DB_PASS'),
   database: process.env.DB_NAME ?? 'seerr',
   ssl: buildSslConfig(),
   poolSize: intFromEnv('DB_POOL_SIZE'),
