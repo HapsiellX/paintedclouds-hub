@@ -28,7 +28,8 @@ export const integrationConfig = (id: string) => {
 const arrStatus = async (
   id: string,
   name: string,
-  apiVersion: 'v1' | 'v3'
+  apiVersion: 'v1' | 'v3',
+  includeQueue = true
 ): Promise<HubServiceStatus> => {
   const { url, apiKey } = integrationConfig(id);
   if (!url || !apiKey) {
@@ -42,7 +43,9 @@ const arrStatus = async (
     });
     const [status, queue] = await Promise.all([
       client.get('/system/status'),
-      client.get('/queue', { params: { page: 1, pageSize: 1 } }),
+      includeQueue
+        ? client.get('/queue', { params: { page: 1, pageSize: 1 } })
+        : Promise.resolve({ data: { totalRecords: 0 } }),
     ]);
     return {
       id,
@@ -88,7 +91,7 @@ export const getHubServiceStatus = async (): Promise<HubServiceStatus[]> =>
     arrStatus('sonarr', 'Sonarr', 'v3'),
     arrStatus('radarr', 'Radarr', 'v3'),
     arrStatus('lidarr', 'Lidarr', 'v1'),
-    arrStatus('prowlarr', 'Prowlarr', 'v1'),
+    arrStatus('prowlarr', 'Prowlarr', 'v1', false),
     sabStatus(),
   ]);
 
