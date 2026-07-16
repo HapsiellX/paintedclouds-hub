@@ -66,17 +66,23 @@ jobs:
             echo 'candidate_digest must be a sha256 digest' >&2
             exit 1
           fi
-          git fetch --force origin "refs/tags/$VERSION:refs/tags/$VERSION"
-          if [[ "$(git cat-file -t "refs/tags/$VERSION")" != tag ]]; then
+          tag_ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" \
+            --jq '[.object.type, .object.sha] | @tsv')
+          read -r tag_type tag_object <<< "$tag_ref"
+          if [[ "$tag_type" != tag ]]; then
             echo 'Release tag must be annotated, not lightweight' >&2
             exit 1
           fi
-          tag_object=$(git rev-parse "refs/tags/$VERSION^{tag}")
-          if [[ "$(gh api "repos/${{ github.repository }}/git/tags/$tag_object" --jq '.verification.verified')" != true ]]; then
+          if [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object" --jq '.verification.verified')" != true ]]; then
             echo 'GitHub did not verify the release tag signature' >&2
             exit 1
           fi
-          tag_sha=$(git rev-list -n 1 "$VERSION")
+          tag_type=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object" --jq '.object.type')
+          tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object" --jq '.object.sha')
+          if [[ "$tag_type" != commit ]]; then
+            echo 'Release tag must point directly to a commit' >&2
+            exit 1
+          fi
           if [[ "$tag_sha" != "$CANDIDATE_SHA" ]]; then
             echo "Tag resolves to $tag_sha, not candidate $CANDIDATE_SHA" >&2
             exit 1
