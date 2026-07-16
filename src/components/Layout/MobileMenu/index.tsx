@@ -4,23 +4,29 @@ import useClickOutside from '@app/hooks/useClickOutside';
 import { Permission, useUser } from '@app/hooks/useUser';
 import { Transition } from '@headlessui/react';
 import {
+  BookOpenIcon,
   ClockIcon,
   CogIcon,
   EllipsisHorizontalIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
+  MusicalNoteIcon,
   SparklesIcon,
+  Squares2X2Icon,
   TvIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import {
+  BookOpenIcon as FilledBookOpenIcon,
   ClockIcon as FilledClockIcon,
   CogIcon as FilledCogIcon,
   ExclamationTriangleIcon as FilledExclamationTriangleIcon,
   EyeSlashIcon as FilledEyeSlashIcon,
   FilmIcon as FilledFilmIcon,
+  MusicalNoteIcon as FilledMusicalNoteIcon,
   SparklesIcon as FilledSparklesIcon,
+  Squares2X2Icon as FilledSquares2X2Icon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
   XMarkIcon,
@@ -72,6 +78,13 @@ const MobileMenu = ({
 
   const menuLinks: MenuLink[] = [
     {
+      href: '/hub',
+      content: intl.formatMessage(menuMessages.hub),
+      svgIcon: <Squares2X2Icon className="h-6 w-6" />,
+      svgIconSelected: <FilledSquares2X2Icon className="h-6 w-6" />,
+      activeRegExp: /^\/hub(?:$|\?query=)/,
+    },
+    {
       href: '/',
       content: intl.formatMessage(menuMessages.dashboard),
       svgIcon: <SparklesIcon className="h-6 w-6" />,
@@ -79,18 +92,32 @@ const MobileMenu = ({
       activeRegExp: /^\/(discover\/?)?$/,
     },
     {
-      href: '/discover/movies',
+      href: '/hub?kinds=movie',
       content: intl.formatMessage(menuMessages.browsemovies),
       svgIcon: <FilmIcon className="h-6 w-6" />,
       svgIconSelected: <FilledFilmIcon className="h-6 w-6" />,
-      activeRegExp: /^\/discover\/movies$/,
+      activeRegExp: /[?&]kinds=movie(?:&|$)/,
     },
     {
-      href: '/discover/tv',
+      href: '/hub?kinds=tv',
       content: intl.formatMessage(menuMessages.browsetv),
       svgIcon: <TvIcon className="h-6 w-6" />,
       svgIconSelected: <FilledTvIcon className="h-6 w-6" />,
-      activeRegExp: /^\/discover\/tv$/,
+      activeRegExp: /[?&]kinds=tv(?:&|$)/,
+    },
+    {
+      href: '/discover/music',
+      content: intl.formatMessage(menuMessages.browsemusic),
+      svgIcon: <MusicalNoteIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledMusicalNoteIcon className="h-6 w-6" />,
+      activeRegExp: /^\/discover\/music/,
+    },
+    {
+      href: '/discover/books',
+      content: intl.formatMessage(menuMessages.browsebooks),
+      svgIcon: <BookOpenIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledBookOpenIcon className="h-6 w-6" />,
+      activeRegExp: /^\/discover\/books/,
     },
     {
       href: '/requests',
@@ -182,7 +209,7 @@ const MobileMenu = ({
         className="absolute left-0 right-0 top-0 flex w-full -translate-y-full flex-col space-y-6 border-t border-gray-600 bg-gray-900/90 px-6 py-6 font-semibold text-gray-100 backdrop-blur"
       >
         {filteredLinks.map((link) => {
-          const isActive = router.pathname.match(link.activeRegExp);
+          const isActive = router.asPath.match(link.activeRegExp);
           return (
             <Link
               key={`mobile-menu-link-${link.href}`}
@@ -231,7 +258,7 @@ const MobileMenu = ({
             .slice(0, filteredLinks.length === 5 ? 5 : 4)
             .map((link) => {
               const isActive =
-                router.pathname.match(link.activeRegExp) && !isOpen;
+                router.asPath.match(link.activeRegExp) && !isOpen;
               return (
                 <Link
                   key={`mobile-menu-link-${link.href}`}
@@ -252,7 +279,7 @@ const MobileMenu = ({
                       <div className="absolute bottom-3 left-3">
                         <Badge
                           className={`bg-gradient-to-br ${
-                            router.pathname.match(link.activeRegExp)
+                            router.asPath.match(link.activeRegExp)
                               ? 'border-indigo-600 from-indigo-700 to-purple-700'
                               : 'border-indigo-500 from-indigo-600 to-purple-600'
                           } flex ${

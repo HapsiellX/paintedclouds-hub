@@ -32,6 +32,7 @@ import authRoutes from './auth';
 import blocklistRoutes from './blocklist';
 import collectionRoutes from './collection';
 import discoverRoutes, { createTmdbWithRegionLanguage } from './discover';
+import hubRoutes from './hub';
 import issueRoutes from './issue';
 import issueCommentRoutes from './issueComment';
 import mediaRoutes from './media';
@@ -171,6 +172,7 @@ router.use('/collection', isAuthenticated(), collectionRoutes);
 router.use('/service', isAuthenticated(), serviceRoutes);
 router.use('/issue', isAuthenticated(), issueRoutes);
 router.use('/issueComment', isAuthenticated(), issueCommentRoutes);
+router.use('/hub', isAuthenticated(), hubRoutes);
 router.use('/auth', authRoutes);
 router.use(
   '/overrideRule',

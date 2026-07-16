@@ -5,12 +5,15 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import {
+  BookOpenIcon,
   ClockIcon,
   CogIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
+  MusicalNoteIcon,
   SparklesIcon,
+  Squares2X2Icon,
   TvIcon,
   UsersIcon,
   XMarkIcon,
@@ -23,8 +26,11 @@ import { useIntl } from 'react-intl';
 
 export const menuMessages = defineMessages('components.Layout.Sidebar', {
   dashboard: 'Discover',
+  hub: 'Hub',
   browsemovies: 'Movies',
-  browsetv: 'Series',
+  browsetv: 'Series & Anime',
+  browsemusic: 'Music',
+  browsebooks: 'Books & Audiobooks',
   requests: 'Requests',
   blocklist: 'Blocklist',
   issues: 'Issues',
@@ -54,22 +60,40 @@ interface SidebarLinkProps {
 
 const SidebarLinks: SidebarLinkProps[] = [
   {
+    href: '/hub',
+    messagesKey: 'hub',
+    svgIcon: <Squares2X2Icon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/hub(?:$|\?query=)/,
+  },
+  {
     href: '/',
     messagesKey: 'dashboard',
     svgIcon: <SparklesIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/(discover\/?)?$/,
   },
   {
-    href: '/discover/movies',
+    href: '/hub?kinds=movie',
     messagesKey: 'browsemovies',
     svgIcon: <FilmIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/discover\/movies$/,
+    activeRegExp: /[?&]kinds=movie(?:&|$)/,
   },
   {
-    href: '/discover/tv',
+    href: '/hub?kinds=tv',
     messagesKey: 'browsetv',
     svgIcon: <TvIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/discover\/tv$/,
+    activeRegExp: /[?&]kinds=tv(?:&|$)/,
+  },
+  {
+    href: '/discover/music',
+    messagesKey: 'browsemusic',
+    svgIcon: <MusicalNoteIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/discover\/music/,
+  },
+  {
+    href: '/discover/books',
+    messagesKey: 'browsebooks',
+    svgIcon: <BookOpenIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/discover\/books/,
   },
   {
     href: '/requests',
@@ -218,7 +242,7 @@ const Sidebar = ({
                             role="button"
                             tabIndex={0}
                             className={`flex items-center rounded-md px-2 py-2 text-base font-medium leading-6 text-white transition duration-150 ease-in-out focus:outline-none ${
-                              router.pathname.match(sidebarLink.activeRegExp)
+                              router.asPath.match(sidebarLink.activeRegExp)
                                 ? 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
                                 : 'hover:bg-gray-700 focus:bg-gray-700'
                             } `}
@@ -278,7 +302,7 @@ const Sidebar = ({
                       href={sidebarLink.href}
                       as={sidebarLink.as}
                       className={`group flex items-center rounded-md px-2 py-2 text-lg font-medium leading-6 text-white transition duration-150 ease-in-out focus:outline-none ${
-                        router.pathname.match(sidebarLink.activeRegExp)
+                        router.asPath.match(sidebarLink.activeRegExp)
                           ? 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
                           : 'hover:bg-gray-700 focus:bg-gray-700'
                       } `}
@@ -294,7 +318,7 @@ const Sidebar = ({
                           <div className="ml-auto flex">
                             <Badge
                               className={`rounded-md bg-gradient-to-br ${
-                                router.pathname.match(sidebarLink.activeRegExp)
+                                router.asPath.match(sidebarLink.activeRegExp)
                                   ? 'border-indigo-600 from-indigo-700 to-purple-700'
                                   : 'border-indigo-500 from-indigo-600 to-purple-600'
                               }`}
@@ -309,7 +333,7 @@ const Sidebar = ({
                           <div className="ml-auto flex">
                             <Badge
                               className={`rounded-md bg-gradient-to-br ${
-                                router.pathname.match(sidebarLink.activeRegExp)
+                                router.asPath.match(sidebarLink.activeRegExp)
                                   ? 'border-indigo-600 from-indigo-700 to-purple-700'
                                   : 'border-indigo-500 from-indigo-600 to-purple-600'
                               }`}
