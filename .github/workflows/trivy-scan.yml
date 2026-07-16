@@ -1,61 +1,58 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Trivy Container Vulnerability Scan
+name: Published Image Scan
 
 on:
-  workflow_run:
-    workflows:
-      - Seerr Release
-    types:
-      - completed
   schedule:
-    - cron: '50 7 * * 5'
+    - cron: '41 5 * * 3'
   workflow_dispatch:
+    inputs:
+      image_ref:
+        description: GHCR tag or digest; defaults to the alpha channel
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
-  trivy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    name: Scan latest container image
+  scan:
+    name: Scan published image
     runs-on: ubuntu-24.04
-
+    timeout-minutes: 20
     permissions:
       contents: read
       security-events: write
-
-    env:
-      TRIVY_CACHE_DIR: .trivycache
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+      - name: Resolve image reference
+        id: image
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.image_ref }}
+          DEFAULT_REF: ghcr.io/${{ github.repository }}:alpha
+        run: |
+          image_ref=${REQUESTED_REF:-$DEFAULT_REF}
+          if [[ "$image_ref" != ghcr.io/${{ github.repository }}:* && \
+                "$image_ref" != ghcr.io/${{ github.repository }}@sha256:* ]]; then
+            echo 'Only this repository GHCR package may be scanned' >&2
+            exit 1
+          fi
+          echo "ref=$image_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Cache Trivy DB
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: .trivycache
-          key: trivy-${{ runner.os }}-${{ hashFiles('**/Dockerfile') }}
-          restore-keys: |
-            trivy-${{ runner.os }}-
-
-      - name: Run Trivy image scan
+      - name: Scan image and produce SARIF
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}:latest
+          image-ref: ${{ steps.image.outputs.ref }}
           format: sarif
           output: trivy.sarif
           ignore-unfixed: true
+          severity: HIGH,CRITICAL
 
-      - name: Upload SARIF to code scanning
+      - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
         with:
           sarif_file: trivy.sarif

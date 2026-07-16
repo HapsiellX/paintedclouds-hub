@@ -39,8 +39,14 @@ RUN \
   case "${TARGETPLATFORM}" in \
   'linux/arm64' | 'linux/arm/v7') \
   apk update && \
-  apk add --no-cache python3 make g++ gcc libc6-compat bash && \
-  npm install --global node-gyp \
+  apk add --no-cache \
+  python3=3.12.13-r0 \
+  make=4.4.1-r3 \
+  g++=15.2.0-r2 \
+  gcc=15.2.0-r2 \
+  gcompat=1.1.0-r4 \
+  bash=5.3.3-r1 && \
+  npm install --global node-gyp@12.2.0 \
   ;; \
   esac
 
@@ -53,23 +59,43 @@ RUN rm -rf .next/cache
 FROM node:22.22.2-alpine3.23@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
 ARG SOURCE_DATE_EPOCH
 ARG COMMIT_TAG
+ARG BUILD_VERSION
+ARG BUILD_DATE
+ARG REPOSITORY_URL
 ENV NODE_ENV=production
 ENV COMMIT_TAG=${COMMIT_TAG}
+ENV APP_VERSION=${BUILD_VERSION}
 
-RUN apk add --no-cache tzdata
+LABEL org.opencontainers.image.title="PaintedClouds Hub" \
+  org.opencontainers.image.description="Experimental multi-media request hub based on Seerr" \
+  org.opencontainers.image.source="${REPOSITORY_URL}" \
+  org.opencontainers.image.revision="${COMMIT_TAG}" \
+  org.opencontainers.image.version="${BUILD_VERSION}" \
+  org.opencontainers.image.created="${BUILD_DATE}" \
+  org.opencontainers.image.licenses="MIT"
 
-USER node:node
+RUN apk add --no-cache tzdata=2026c-r0
 
 WORKDIR /app
 
-COPY --chown=node:node . .
+COPY --chown=node:node package.json ./package.json
+COPY --chown=node:node next.config.ts ./next.config.ts
+COPY --chown=node:node seerr-api.yml ./seerr-api.yml
+COPY --chown=node:node public ./public
 COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/.next ./.next
 COPY --chown=node:node --from=build /app/dist ./dist
 
-RUN touch config/DOCKER && \
-  echo "{\"commitTag\": \"${COMMIT_TAG}\"}" > committag.json
+RUN mkdir -p config/db config/logs && \
+  touch config/DOCKER && \
+  echo "{\"commitTag\": \"${COMMIT_TAG}\"}" > committag.json && \
+  chown -R node:node /app/config /app/committag.json
+
+USER node:node
 
 EXPOSE 5055
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget --quiet --output-document=/dev/null http://127.0.0.1:5055/api/v1/status || exit 1
 
 CMD [ "npm", "start" ]

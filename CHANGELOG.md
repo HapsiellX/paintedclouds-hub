@@ -1,3 +1,38 @@
+# Changelog
+
+This file records PaintedClouds Hub changes followed by preserved upstream
+history. Upstream entries are the work of their respective Overseerr,
+Jellyseerr, and Seerr contributors and are retained for provenance; they are not
+claims of authorship by PaintedClouds Hub.
+
+PaintedClouds Hub is an independent fork and is not affiliated with or endorsed
+by those upstream projects. Published release notes must identify the exact
+source commit, upstream base, supported migration path, known limitations,
+container digest, and rollback requirements.
+
+## Unreleased
+
+### Added
+
+- Unified Hub discovery and request workflows for artists, albums, e-books, and
+  audiobooks.
+- Music and book discovery pages backed by MusicBrainz, Cover Art Archive, and
+  Open Library.
+- Lidarr and LazyLibrarian acquisition submission, weighted request policy,
+  audit events, integration health, and optional Home Assistant notifications.
+- Initial public security, privacy, support, governance, attribution,
+  contribution, roadmap, and community documentation.
+
+### Alpha limitations
+
+- No PaintedClouds Hub release has been declared stable.
+- Migration compatibility and exact artifact coordinates will be stated only in
+  an individual published release.
+- Book edition matching and downstream acquisition-state synchronization remain
+  incomplete. See `README.md` and `ROADMAP.md`.
+
+## Preserved Upstream History
+
 ## [2.7.3](https://github.com/fallenbagel/jellyseerr/compare/v2.7.2...v2.7.3) (2025-08-14)
 
 
