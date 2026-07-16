@@ -88,7 +88,7 @@ const HubPage: NextPage = () => {
   const searchUrl = useMemo(
     () =>
       submittedQuery
-        ? `/api/v1/hub/search?query=${encodeURIComponent(submittedQuery)}&kinds=${kinds.join(',')}`
+        ? `/api/v1/hub/search?query=${encodeURIComponent(submittedQuery)}&kinds=${encodeURIComponent(kinds.join(','))}`
         : null,
     [submittedQuery, kinds]
   );
