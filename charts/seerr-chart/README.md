@@ -1,20 +1,20 @@
-# seerr-chart
+# paintedclouds-hub
 
-![Version: 3.6.0](https://img.shields.io/badge/Version-3.6.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.2.0](https://img.shields.io/badge/AppVersion-v3.2.0-informational?style=flat-square)
+![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.3.0](https://img.shields.io/badge/AppVersion-0.3.0-informational?style=flat-square)
 
-Seerr helm chart for Kubernetes
+Experimental PaintedClouds Hub Helm chart for Kubernetes
 
-**Homepage:** <https://github.com/seerr-team/seerr>
+**Homepage:** <https://github.com/HapsiellX/paintedclouds-hub>
 
 ## Maintainers
 
 | Name | Email | Url |
 | ---- | ------ | --- |
-| Seerr Team |  | <https://github.com/orgs/seerr-team/people> |
+| PaintedClouds Hub maintainers |  | <https://github.com/HapsiellX/paintedclouds-hub> |
 
 ## Source Code
 
-* <https://github.com/seerr-team/seerr/tree/main/charts/seerr-chart>
+* <https://github.com/HapsiellX/paintedclouds-hub/tree/main/charts/seerr-chart>
 
 ## Requirements
 
@@ -22,22 +22,14 @@ Kubernetes: `>=1.23.0-0`
 
 ## Installation
 
-Refer to [Seerr kubernetes documentation](https://docs.seerr.dev/getting-started/kubernetes)
+Use the [PaintedClouds Hub Kubernetes guide](../../docs/getting-started/kubernetes.mdx).
+The chart is distributed as source only in V0.3; pin the container digest from
+the matching signed GitHub release.
 
 ## Update Notes
 
-### Updating to 3.0.0
-
-Nothing has changed; we just rebranded the `jellyseerr` Helm chart to `seerr` 🥳 refer to our [Migration guide](https://docs.seerr.dev/migration-guide).
-
-### Updating to 2.7.0
-
-Seerr is a stateful application and it is not designed to have multiple replicas. In version 2.7.0 we address this by:
-
-- replacing `Deployment` with `StatefulSet`
-- removing `replicaCount` value
-
-If `replicaCount` value was used - remove it. Helm update should work fine after that.
+PaintedClouds Hub is stateful and supports one application replica. Back up the
+database, configuration volume and `hub-secrets.key` together before upgrades.
 
 ## Values
 
@@ -58,7 +50,7 @@ If `replicaCount` value was used - remove it. Helm update should work fine after
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
-| image.repository | string | `"seerr-team/seerr"` |  |
+| image.repository | string | `"hapsiellx/paintedclouds-hub"` |  |
 | image.sha | string | `""` |  |
 | image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | imagePullSecrets | list | `[]` |  |

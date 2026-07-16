@@ -16,21 +16,13 @@
 
 ## Installation
 
-Refer to [Seerr kubernetes documentation](https://docs.seerr.dev/getting-started/kubernetes)
+Use the [PaintedClouds Hub Kubernetes guide](../../docs/getting-started/kubernetes.mdx).
+The chart is distributed as source only in V0.3; pin the container digest from
+the matching signed GitHub release.
 
 ## Update Notes
 
-### Updating to 3.0.0
-
-Nothing has changed; we just rebranded the `jellyseerr` Helm chart to `seerr` 🥳 refer to our [Migration guide](https://docs.seerr.dev/migration-guide).
-
-### Updating to 2.7.0
-
-Seerr is a stateful application and it is not designed to have multiple replicas. In version 2.7.0 we address this by:
-
-- replacing `Deployment` with `StatefulSet`
-- removing `replicaCount` value
-
-If `replicaCount` value was used - remove it. Helm update should work fine after that.
+PaintedClouds Hub is stateful and supports one application replica. Back up the
+database, configuration volume and `hub-secrets.key` together before upgrades.
 
 {{ template "chart.valuesSection" . }}

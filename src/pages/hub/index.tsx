@@ -79,6 +79,7 @@ const kindLabelsEn: Record<HubKind, string> = {
 const stateLabelsDe: Record<string, string> = {
   pending: 'Freigabe nötig',
   approved: 'Freigegeben',
+  processing: 'Wird verarbeitet',
   submitted: 'Übermittelt',
   downloading: 'Wird geladen',
   imported: 'Importiert',
@@ -91,6 +92,7 @@ const stateLabelsDe: Record<string, string> = {
 const stateLabelsEn: Record<string, string> = {
   pending: 'Approval required',
   approved: 'Approved',
+  processing: 'Processing',
   submitted: 'Submitted',
   downloading: 'Downloading',
   imported: 'Imported',
@@ -263,7 +265,13 @@ const HubPage: NextPage = () => {
 
   return (
     <div className="space-y-8 pb-10">
-      <header className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/80 to-gray-900 p-6 shadow-xl">
+      <header
+        className="rounded-2xl border border-indigo-500/20 bg-cover bg-center p-6 shadow-xl"
+        style={{
+          backgroundImage:
+            'linear-gradient(100deg, rgba(8, 10, 28, 0.98) 0%, rgba(16, 18, 45, 0.92) 48%, rgba(12, 10, 35, 0.58) 100%), url(/images/paintedclouds-hub-hero-v0.3.webp)',
+        }}
+      >
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-indigo-300">
           PaintedClouds Hub
         </p>
@@ -435,7 +443,7 @@ const HubPage: NextPage = () => {
         </section>
       )}
 
-      <section>
+      <section id="activity" className="scroll-mt-24">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <ServerStackIcon className="h-6 w-6 text-indigo-300" />

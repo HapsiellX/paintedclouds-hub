@@ -276,6 +276,42 @@ describe('Hub authorization and privacy', () => {
     assert.strictEqual(quota.status, 200);
     assertNoSensitiveFields(quota.body);
   });
+
+  it('claims a pending approval once and rejects concurrent stale actions', async () => {
+    const hubRequest = await seedHubRequest('friend@seerr.dev', 'OL830W');
+    const agent = await loginAs('admin@seerr.dev');
+    const responses = await Promise.all([
+      agent.post(`/hub/requests/${hubRequest.id}/approve`),
+      agent.post(`/hub/requests/${hubRequest.id}/approve`),
+    ]);
+    assert.deepStrictEqual(
+      responses.map((response) => response.status).sort(),
+      [200, 409]
+    );
+    const auditEvents = await getRepository(HubAuditEvent).find({
+      where: { request: { id: hubRequest.id } },
+    });
+    assert.equal(auditEvents.length, 1);
+    assert.equal(auditEvents[0].action, 'failed');
+  });
+
+  it('declines only pending requests', async () => {
+    const hubRequest = await seedHubRequest(
+      'friend@seerr.dev',
+      'OL840W',
+      'previous failure'
+    );
+    const agent = await loginAs('admin@seerr.dev');
+    const response = await agent
+      .post(`/hub/requests/${hubRequest.id}/decline`)
+      .send({ reason: 'No longer needed' });
+    assert.strictEqual(response.status, 409);
+    assert.equal(
+      (await getRepository(HubRequest).findOneByOrFail({ id: hubRequest.id }))
+        .state,
+      HubRequestState.FAILED
+    );
+  });
 });
 
 describe('Hub inbound rate limits', () => {

@@ -1,5 +1,7 @@
 # Generated files which we would not like to format
 .next/
+gen-docs/.docusaurus/
+gen-docs/build/
 .pnpm-store/
 dist/
 config/

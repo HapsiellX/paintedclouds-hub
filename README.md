@@ -1,5 +1,7 @@
 # PaintedClouds Hub
 
+![PaintedClouds Hub cross-media artwork](./public/images/paintedclouds-hub-hero-v0.3.webp)
+
 PaintedClouds Hub is an independent, open-source media request and discovery
 manager for self-hosted libraries. It extends the movie and television
 workflows inherited from [Seerr](https://github.com/seerr-team/seerr) with
@@ -27,7 +29,7 @@ PaintedClouds Hub problems here, not to Seerr's support channels.
 - Supports Jellyfin, Plex, and Emby authentication inherited from Seerr.
 - Supports SQLite and PostgreSQL.
 
-## V0.2 Supported Scope
+## V0.3 Supported Scope
 
 - Music and book requests use canonical MusicBrainz and Open Library identities.
   Books with multiple editions require an explicit edition selection.
@@ -37,6 +39,13 @@ PaintedClouds Hub problems here, not to Seerr's support channels.
   rolling points ledger on SQLite and PostgreSQL.
 - Core Hub administration, activity, discovery, detail and request workflows
   are supported in English and German.
+- The application home, global search, navigation and release information now
+  use one cross-media PaintedClouds workflow and the official project GitHub
+  repository.
+- Prowlarr and SABnzbd health integrations are configured and encrypted in the
+  Admin UI; legacy runtime key mounts can be removed after the V0.3 migration.
+- Request approval, retry and decline transitions reject stale or concurrent
+  actions, and credentialed integration calls never follow redirects.
 - Personalization, AI recommendations, Readarr and additional acquisition
   backends are not part of V0.2.
 - External metadata and cover services may return incomplete results, throttle
@@ -81,6 +90,10 @@ files are imported once. The Admin UI is authoritative afterwards, so remove
 the legacy variables after validating the import. Use a monitored role-based
 contact address for metadata providers; that address is disclosed to
 MusicBrainz and Open Library as part of responsible client identification.
+
+On the first V0.3 start, existing Prowlarr and SABnzbd `HUB_*` values are
+imported into the same encrypted Admin UI. Validate both connection tests and
+then remove those final compatibility variables and secret mounts.
 
 Do not publish logs, Compose files, screenshots, or issue reports containing API
 keys, webhook URLs, database credentials, session cookies, or private hostnames.

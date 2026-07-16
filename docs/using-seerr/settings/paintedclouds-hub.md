@@ -13,6 +13,8 @@ authoritative configuration source from V0.2 onward.
 
 Configure Lidarr with its base URL, API key, root directory, quality profile,
 and metadata profile. Configure LazyLibrarian with its base URL and API key.
+Configure Prowlarr and SABnzbd in the same screen for central health and queue
+visibility.
 Save new credentials before running a connection test. Secret values are masked
 after saving and can only be replaced or explicitly deleted.
 
@@ -56,3 +58,11 @@ On the first V0.2 start, legacy `HUB_*` environment values and supported
 `*_FILE` secrets are imported and encrypted once. Verify the values and service
 tests in the Admin UI, then remove the legacy variables. Back up
 `settings.json`, `hub-secrets.key`, and the database before the upgrade.
+
+## V0.2 upgrade
+
+On the first V0.3 start, the remaining Prowlarr and SABnzbd `HUB_*` values and
+`*_FILE` secrets are imported into encrypted settings. Test both services in
+the Admin UI, take a fresh backup, and remove their legacy environment values
+and secret mounts. V0.3 rejects stale concurrent approve, retry and decline
+actions with HTTP 409 instead of repeating downstream side effects.

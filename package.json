@@ -1,6 +1,6 @@
 {
   "name": "paintedclouds-hub",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "packageManager": "pnpm@10.24.0",
   "scripts": {
@@ -31,6 +31,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/HapsiellX/paintedclouds-hub.git"
+  },
+  "homepage": "https://github.com/HapsiellX/paintedclouds-hub#readme",
+  "bugs": {
+    "url": "https://github.com/HapsiellX/paintedclouds-hub/issues"
   },
   "license": "MIT",
   "dependencies": {

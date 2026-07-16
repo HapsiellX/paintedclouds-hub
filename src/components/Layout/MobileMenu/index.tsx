@@ -13,7 +13,6 @@ import {
   FilmIcon,
   MusicalNoteIcon,
   SparklesIcon,
-  Squares2X2Icon,
   TvIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -26,7 +25,6 @@ import {
   FilmIcon as FilledFilmIcon,
   MusicalNoteIcon as FilledMusicalNoteIcon,
   SparklesIcon as FilledSparklesIcon,
-  Squares2X2Icon as FilledSquares2X2Icon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
   XMarkIcon,
@@ -78,32 +76,25 @@ const MobileMenu = ({
 
   const menuLinks: MenuLink[] = [
     {
-      href: '/hub',
-      content: intl.formatMessage(menuMessages.hub),
-      svgIcon: <Squares2X2Icon className="h-6 w-6" />,
-      svgIconSelected: <FilledSquares2X2Icon className="h-6 w-6" />,
-      activeRegExp: /^\/hub(?:$|\?query=)/,
-    },
-    {
       href: '/',
       content: intl.formatMessage(menuMessages.dashboard),
       svgIcon: <SparklesIcon className="h-6 w-6" />,
       svgIconSelected: <FilledSparklesIcon className="h-6 w-6" />,
-      activeRegExp: /^\/(discover\/?)?$/,
+      activeRegExp: /^\/$/,
     },
     {
-      href: '/hub?kinds=movie',
+      href: '/discover/movies',
       content: intl.formatMessage(menuMessages.browsemovies),
       svgIcon: <FilmIcon className="h-6 w-6" />,
       svgIconSelected: <FilledFilmIcon className="h-6 w-6" />,
-      activeRegExp: /[?&]kinds=movie(?:&|$)/,
+      activeRegExp: /^\/discover\/movies/,
     },
     {
-      href: '/hub?kinds=tv',
+      href: '/discover/tv',
       content: intl.formatMessage(menuMessages.browsetv),
       svgIcon: <TvIcon className="h-6 w-6" />,
       svgIconSelected: <FilledTvIcon className="h-6 w-6" />,
-      activeRegExp: /[?&]kinds=tv(?:&|$)/,
+      activeRegExp: /^\/discover\/tv/,
     },
     {
       href: '/discover/music',
@@ -120,11 +111,11 @@ const MobileMenu = ({
       activeRegExp: /^\/discover\/books/,
     },
     {
-      href: '/requests',
+      href: '/hub#activity',
       content: intl.formatMessage(menuMessages.requests),
       svgIcon: <ClockIcon className="h-6 w-6" />,
       svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
-      activeRegExp: /^\/requests/,
+      activeRegExp: /^\/hub#activity/,
     },
     {
       href: '/blocklist',
@@ -230,7 +221,7 @@ const MobileMenu = ({
                 className: 'h-5 w-5',
               })}
               <span className="ml-2">{link.content}</span>
-              {link.href === '/requests' &&
+              {link.href === '/hub#activity' &&
                 pendingRequestsCount > 0 &&
                 hasPermission(Permission.MANAGE_REQUESTS) && (
                   <div className="ml-auto flex">
@@ -273,7 +264,7 @@ const MobileMenu = ({
                       className: 'h-6 w-6',
                     }
                   )}
-                  {link.href === '/requests' &&
+                  {link.href === '/hub#activity' &&
                     pendingRequestsCount > 0 &&
                     hasPermission(Permission.MANAGE_REQUESTS) && (
                       <div className="absolute bottom-3 left-3">

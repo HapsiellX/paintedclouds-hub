@@ -10,6 +10,7 @@ import DiscoverSlider from '@server/entity/DiscoverSlider';
 import type { StatusResponse } from '@server/interfaces/api/settingsInterfaces';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { isReleaseUpdateAvailable } from '@server/lib/updateStatus';
 import logger from '@server/logger';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import deprecatedRoute from '@server/middleware/deprecation';
@@ -57,7 +58,7 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
   let commitsBehind = 0;
 
   if (currentVersion.startsWith('develop-') && commitTag !== 'local') {
-    const commits = await githubApi.getSeerrCommits();
+    const commits = await githubApi.getProjectCommits();
 
     if (commits.length) {
       const filteredCommits = commits.filter(
@@ -76,15 +77,9 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
       }
     }
   } else if (commitTag !== 'local') {
-    const releases = await githubApi.getSeerrReleases();
+    const releases = await githubApi.getProjectReleases();
 
-    if (releases.length) {
-      const latestVersion = releases[0];
-
-      if (!latestVersion.name.includes(currentVersion)) {
-        updateAvailable = true;
-      }
-    }
+    updateAvailable = isReleaseUpdateAvailable(currentVersion, releases);
   }
 
   return res.status(200).json({
@@ -94,6 +89,22 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
     commitsBehind,
     restartRequired: restartFlag.isSet(),
   });
+});
+
+router.get('/status/releases', isAuthenticated(), async (_req, res) => {
+  const releases = await new GithubAPI().getProjectReleases();
+  return res.json(
+    releases.map((release) => ({
+      id: release.id,
+      tagName: release.tag_name,
+      name: release.name || release.tag_name,
+      htmlUrl: release.html_url,
+      prerelease: release.prerelease,
+      createdAt: release.created_at,
+      publishedAt: release.published_at,
+      body: release.body || '',
+    }))
+  );
 });
 
 router.get('/status/appdata', (_req, res) => {

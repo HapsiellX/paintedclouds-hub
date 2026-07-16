@@ -13,7 +13,6 @@ import {
   FilmIcon,
   MusicalNoteIcon,
   SparklesIcon,
-  Squares2X2Icon,
   TvIcon,
   UsersIcon,
   XMarkIcon,
@@ -25,13 +24,13 @@ import { Fragment, useEffect, useRef } from 'react';
 import { useIntl } from 'react-intl';
 
 export const menuMessages = defineMessages('components.Layout.Sidebar', {
-  dashboard: 'Discover',
+  dashboard: 'Home',
   hub: 'Hub',
   browsemovies: 'Movies',
   browsetv: 'Series & Anime',
   browsemusic: 'Music',
   browsebooks: 'Books & Audiobooks',
-  requests: 'Requests',
+  requests: 'Activity',
   blocklist: 'Blocklist',
   issues: 'Issues',
   users: 'Users',
@@ -60,28 +59,22 @@ interface SidebarLinkProps {
 
 const SidebarLinks: SidebarLinkProps[] = [
   {
-    href: '/hub',
-    messagesKey: 'hub',
-    svgIcon: <Squares2X2Icon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/hub(?:$|\?query=)/,
-  },
-  {
     href: '/',
     messagesKey: 'dashboard',
     svgIcon: <SparklesIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/(discover\/?)?$/,
+    activeRegExp: /^\/$/,
   },
   {
-    href: '/hub?kinds=movie',
+    href: '/discover/movies',
     messagesKey: 'browsemovies',
     svgIcon: <FilmIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /[?&]kinds=movie(?:&|$)/,
+    activeRegExp: /^\/discover\/movies/,
   },
   {
-    href: '/hub?kinds=tv',
+    href: '/discover/tv',
     messagesKey: 'browsetv',
     svgIcon: <TvIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /[?&]kinds=tv(?:&|$)/,
+    activeRegExp: /^\/discover\/tv/,
   },
   {
     href: '/discover/music',
@@ -96,10 +89,10 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/books/,
   },
   {
-    href: '/requests',
+    href: '/hub#activity',
     messagesKey: 'requests',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/requests/,
+    activeRegExp: /^\/hub#activity/,
   },
   {
     href: '/blocklist',

@@ -14,6 +14,8 @@ interface HubSettingsResponse {
     apiKeyConfigured: boolean;
   };
   lazyLibrarian: { url: string; apiKeyConfigured: boolean };
+  prowlarr: { url: string; apiKeyConfigured: boolean };
+  sabnzbd: { url: string; apiKeyConfigured: boolean };
   homeAssistant: { webhookUrlConfigured: boolean };
   metadata: { contactEmail: string; userAgent: string };
   defaults: { languages: string[]; bookFormats: ('ebook' | 'audiobook')[] };
@@ -36,9 +38,13 @@ const SettingsHub = () => {
   const [form, setForm] = useState<HubSettingsResponse>();
   const [lidarrKey, setLidarrKey] = useState('');
   const [lazyKey, setLazyKey] = useState('');
+  const [prowlarrKey, setProwlarrKey] = useState('');
+  const [sabnzbdKey, setSabnzbdKey] = useState('');
   const [webhook, setWebhook] = useState('');
   const [clearLidarrKey, setClearLidarrKey] = useState(false);
   const [clearLazyKey, setClearLazyKey] = useState(false);
+  const [clearProwlarrKey, setClearProwlarrKey] = useState(false);
+  const [clearSabnzbdKey, setClearSabnzbdKey] = useState(false);
   const [clearWebhook, setClearWebhook] = useState(false);
   const [message, setMessage] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -52,7 +58,7 @@ const SettingsHub = () => {
     );
 
   const updateService = (
-    service: 'lidarr' | 'lazyLibrarian',
+    service: 'lidarr' | 'lazyLibrarian' | 'prowlarr' | 'sabnzbd',
     values: Partial<HubSettingsResponse[typeof service]>
   ) => setForm({ ...form, [service]: { ...form[service], ...values } });
 
@@ -75,6 +81,16 @@ const SettingsHub = () => {
           ...(lazyKey ? { apiKey: lazyKey } : {}),
           ...(clearLazyKey ? { clearApiKey: true } : {}),
         },
+        prowlarr: {
+          url: form.prowlarr.url,
+          ...(prowlarrKey ? { apiKey: prowlarrKey } : {}),
+          ...(clearProwlarrKey ? { clearApiKey: true } : {}),
+        },
+        sabnzbd: {
+          url: form.sabnzbd.url,
+          ...(sabnzbdKey ? { apiKey: sabnzbdKey } : {}),
+          ...(clearSabnzbdKey ? { clearApiKey: true } : {}),
+        },
         homeAssistant: {
           ...(webhook ? { webhookUrl: webhook } : {}),
           ...(clearWebhook ? { clearWebhookUrl: true } : {}),
@@ -86,9 +102,13 @@ const SettingsHub = () => {
       });
       setLidarrKey('');
       setLazyKey('');
+      setProwlarrKey('');
+      setSabnzbdKey('');
       setWebhook('');
       setClearLidarrKey(false);
       setClearLazyKey(false);
+      setClearProwlarrKey(false);
+      setClearSabnzbdKey(false);
       setClearWebhook(false);
       await mutate();
       setMessage(
@@ -108,12 +128,21 @@ const SettingsHub = () => {
     }
   };
 
-  const test = async (service: 'lidarr' | 'lazylibrarian') => {
+  const test = async (
+    service: 'lidarr' | 'lazylibrarian' | 'prowlarr' | 'sabnzbd'
+  ) => {
     setMessage(undefined);
     try {
       await axios.post(`/api/v1/settings/hub/test/${service}`);
       setMessage(
-        `${service === 'lidarr' ? 'Lidarr' : 'LazyLibrarian'} ${tr('ist erreichbar.', 'is reachable.')}`
+        `${
+          {
+            lidarr: 'Lidarr',
+            lazylibrarian: 'LazyLibrarian',
+            prowlarr: 'Prowlarr',
+            sabnzbd: 'SABnzbd',
+          }[service]
+        } ${tr('ist erreichbar.', 'is reachable.')}`
       );
     } catch {
       setMessage(
@@ -288,6 +317,90 @@ const SettingsHub = () => {
             {tr('Verbindung testen', 'Test connection')}
           </button>
         </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        {(
+          [
+            {
+              id: 'prowlarr' as const,
+              name: 'Prowlarr',
+              key: prowlarrKey,
+              setKey: setProwlarrKey,
+              clear: clearProwlarrKey,
+              setClear: setClearProwlarrKey,
+            },
+            {
+              id: 'sabnzbd' as const,
+              name: 'SABnzbd',
+              key: sabnzbdKey,
+              setKey: setSabnzbdKey,
+              clear: clearSabnzbdKey,
+              setClear: setClearSabnzbdKey,
+            },
+          ] as const
+        ).map((service) => (
+          <div
+            key={service.id}
+            className="space-y-4 rounded-lg border border-gray-700 bg-gray-900/50 p-5"
+          >
+            <div>
+              <h2 className="text-lg font-semibold">{service.name}</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                {tr(
+                  'Status- und Warteschlangenüberwachung für die zentrale Übersicht.',
+                  'Health and queue monitoring for the central overview.'
+                )}
+              </p>
+            </div>
+            <label className="block text-sm">
+              URL
+              <input
+                className={fieldClass}
+                value={form[service.id].url}
+                onChange={(event) =>
+                  updateService(service.id, { url: event.target.value })
+                }
+              />
+            </label>
+            <label className="block text-sm">
+              {tr('API-Schlüssel', 'API key')}{' '}
+              {form[service.id].apiKeyConfigured && (
+                <span className="text-emerald-400">
+                  {tr('(gesetzt)', '(configured)')}
+                </span>
+              )}
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={fieldClass}
+                value={service.key}
+                onChange={(event) => service.setKey(event.target.value)}
+                placeholder={tr(
+                  'Leer lassen, um den bestehenden Schlüssel zu behalten',
+                  'Leave blank to keep the existing key'
+                )}
+              />
+            </label>
+            {form[service.id].apiKeyConfigured && (
+              <label className="flex items-center gap-2 text-sm text-red-200">
+                <input
+                  type="checkbox"
+                  checked={service.clear}
+                  onChange={(event) => service.setClear(event.target.checked)}
+                />
+                {tr('Gespeicherten Schlüssel löschen', 'Delete stored key')}
+              </label>
+            )}
+            <button
+              type="button"
+              className="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
+              onClick={() => test(service.id)}
+            >
+              {tr('Verbindung testen', 'Test connection')}
+            </button>
+          </div>
+        ))}
       </section>
 
       <section className="space-y-4 rounded-lg border border-gray-700 bg-gray-900/50 p-5">

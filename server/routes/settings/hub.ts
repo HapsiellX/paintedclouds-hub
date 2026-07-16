@@ -14,7 +14,7 @@ const safeServiceUrl = z
   .max(2000)
   .refine((value) => {
     const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
     return (
       ['http:', 'https:'].includes(url.protocol) &&
       !url.username &&
@@ -23,7 +23,9 @@ const safeServiceUrl = z
       hostname !== 'metadata.google.internal' &&
       hostname !== '169.254.169.254' &&
       !hostname.startsWith('169.254.') &&
-      !hostname.startsWith('fe80:')
+      !hostname.startsWith('fe80:') &&
+      !hostname.startsWith('::ffff:169.254.') &&
+      !hostname.startsWith('::ffff:a9fe:')
     );
   }, 'Unsafe service URL.');
 const optionalUrl = z.union([z.literal(''), safeServiceUrl]);
@@ -39,6 +41,16 @@ const schema = z
       metadataProfileId: z.number().int().nonnegative(),
     }),
     lazyLibrarian: z.object({
+      url: optionalUrl,
+      apiKey: z.string().max(1000).optional(),
+      clearApiKey: z.boolean().optional(),
+    }),
+    prowlarr: z.object({
+      url: optionalUrl,
+      apiKey: z.string().max(1000).optional(),
+      clearApiKey: z.boolean().optional(),
+    }),
+    sabnzbd: z.object({
       url: optionalUrl,
       apiKey: z.string().max(1000).optional(),
       clearApiKey: z.boolean().optional(),
@@ -94,6 +106,16 @@ const publicSettings = () => {
       apiKey: undefined,
       apiKeyConfigured: Boolean(hub.lazyLibrarian.apiKey),
     },
+    prowlarr: {
+      ...hub.prowlarr,
+      apiKey: undefined,
+      apiKeyConfigured: Boolean(hub.prowlarr.apiKey),
+    },
+    sabnzbd: {
+      ...hub.sabnzbd,
+      apiKey: undefined,
+      apiKeyConfigured: Boolean(hub.sabnzbd.apiKey),
+    },
     homeAssistant: {
       webhookUrlConfigured: Boolean(hub.homeAssistant.webhookUrl),
     },
@@ -121,10 +143,20 @@ hubSettingsRoutes.put('/', async (req, res) => {
     clearApiKey: clearLazyLibrarianApiKey,
     ...lazyLibrarian
   } = next.lazyLibrarian;
+  const {
+    apiKey: prowlarrApiKey,
+    clearApiKey: clearProwlarrApiKey,
+    ...prowlarr
+  } = next.prowlarr;
+  const {
+    apiKey: sabnzbdApiKey,
+    clearApiKey: clearSabnzbdApiKey,
+    ...sabnzbd
+  } = next.sabnzbd;
   settings.hub = {
     ...settings.hub,
     ...next,
-    configurationVersion: 2,
+    configurationVersion: 3,
     environmentImported: settings.hub.environmentImported,
     lidarr: {
       ...lidarr,
@@ -141,6 +173,22 @@ hubSettingsRoutes.put('/', async (req, res) => {
         : lazyLibrarianApiKey
           ? encryptHubSecret(lazyLibrarianApiKey, 'lazylibrarian-api-key')
           : settings.hub.lazyLibrarian.apiKey,
+    },
+    prowlarr: {
+      ...prowlarr,
+      apiKey: clearProwlarrApiKey
+        ? undefined
+        : prowlarrApiKey
+          ? encryptHubSecret(prowlarrApiKey, 'prowlarr-api-key')
+          : settings.hub.prowlarr.apiKey,
+    },
+    sabnzbd: {
+      ...sabnzbd,
+      apiKey: clearSabnzbdApiKey
+        ? undefined
+        : sabnzbdApiKey
+          ? encryptHubSecret(sabnzbdApiKey, 'sabnzbd-api-key')
+          : settings.hub.sabnzbd.apiKey,
     },
     homeAssistant: {
       webhookUrl: next.homeAssistant.clearWebhookUrl
@@ -169,29 +217,28 @@ hubSettingsRoutes.put('/', async (req, res) => {
 hubSettingsRoutes.post('/test/:service', async (req, res) => {
   const settings = getSettings().hub;
   const service = z
-    .enum(['lidarr', 'lazylibrarian'])
+    .enum(['lidarr', 'lazylibrarian', 'prowlarr', 'sabnzbd'])
     .safeParse(req.params.service);
   if (!service.success)
     return res.status(404).json({ message: 'Unknown service.' });
   const selected =
-    service.data === 'lidarr' ? settings.lidarr : settings.lazyLibrarian;
+    settings[service.data === 'lazylibrarian' ? 'lazyLibrarian' : service.data];
   if (!selected.url || !selected.apiKey) {
     return res
       .status(400)
       .json({ message: 'Service URL and API key are required.' });
   }
-  const purpose =
-    service.data === 'lidarr' ? 'lidarr-api-key' : 'lazylibrarian-api-key';
+  const purpose = `${service.data}-api-key`;
   try {
     const response = await axios.get(
-      service.data === 'lidarr'
+      service.data === 'lidarr' || service.data === 'prowlarr'
         ? `${selected.url.replace(/\/$/, '')}/api/v1/system/status`
         : `${selected.url.replace(/\/$/, '')}/api`,
       {
         timeout: 10_000,
         maxRedirects: 0,
         headers:
-          service.data === 'lidarr'
+          service.data === 'lidarr' || service.data === 'prowlarr'
             ? { 'X-Api-Key': decryptHubSecret(selected.apiKey, purpose) }
             : undefined,
         params:
@@ -200,7 +247,13 @@ hubSettingsRoutes.post('/test/:service', async (req, res) => {
                 cmd: 'getVersion',
                 apikey: decryptHubSecret(selected.apiKey, purpose),
               }
-            : undefined,
+            : service.data === 'sabnzbd'
+              ? {
+                  mode: 'version',
+                  output: 'json',
+                  apikey: decryptHubSecret(selected.apiKey, purpose),
+                }
+              : undefined,
       }
     );
     return res.json({

@@ -1,26 +1,31 @@
 ---
-title: Kubernetes (Advanced)
-description: Install Seerr in Kubernetes
-sidebar_position: 3
+title: Kubernetes
+description: Run PaintedClouds Hub on Kubernetes from the project chart source.
+sidebar_position: 4
 ---
+
 # Kubernetes
-:::warning
-This method is not recommended for most users. It is intended for advanced users who are using Kubernetes.
-:::
 
-:::info
-All official Seerr charts are cryptographically signed and include a verified [Software Bill of Materials (SBOM)](https://cyclonedx.org/).
+The V0.3 repository contains an experimental PaintedClouds Hub chart under
+[`charts/seerr-chart`](https://github.com/HapsiellX/paintedclouds-hub/tree/main/charts/seerr-chart),
+but no signed OCI chart is published yet. Do not install the upstream Seerr
+chart: it deploys a different application image and follows a different release
+channel.
 
-To confirm that the chart you are using is authentic and unmodified, please refer to the [Verifying Signed Artifacts](/using-seerr/advanced/verifying-signed-artifacts#verifying-signed-helm-charts) guide.
-:::
+For production, render the chart from the exact signed PaintedClouds Hub source
+tag and pin `image.sha` to the digest from that version's GitHub release:
 
-## Installation
-```console
-helm install seerr oci://ghcr.io/seerr-team/seerr/seerr-chart
+```bash
+git clone --branch v0.3.0 --depth 1 \
+  https://github.com/HapsiellX/paintedclouds-hub.git
+
+helm upgrade --install paintedclouds-hub \
+  ./paintedclouds-hub/charts/seerr-chart \
+  --set image.tag=0.3.0 \
+  --set image.sha=sha256:RELEASE_DIGEST
 ```
-Helm values can be found in the Seerr repository under [charts/seerr-chart/README.md](https://github.com/seerr-team/seerr/tree/develop/charts/seerr-chart).
 
-Verify the signature with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) (replace [tag], with the TAG you want to verify) :
-```console
-cosign verify ghcr.io/seerr-team/seerr/seerr-chart:[tag] --certificate-identity=https://github.com/seerr-team/seerr/.github/workflows/helm.yml@refs/heads/main --certificate-oidc-issuer=https://token.actions.githubusercontent.com
-```
+PaintedClouds Hub is stateful and supports exactly one application replica.
+Provide persistent storage for `/app/config`, back up the configuration and
+database together, and retain `hub-secrets.key`. Verify the container image
+signature and SBOM attestation before deployment.

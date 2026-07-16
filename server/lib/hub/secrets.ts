@@ -77,12 +77,16 @@ export const decryptHubSecret = (
 export const validateHubSecrets = (values: {
   lidarr?: HubSecretValue;
   lazyLibrarian?: HubSecretValue;
+  prowlarr?: HubSecretValue;
+  sabnzbd?: HubSecretValue;
   homeAssistant?: HubSecretValue;
 }): void => {
   if (values.lidarr) decryptHubSecret(values.lidarr, 'lidarr-api-key');
   if (values.lazyLibrarian) {
     decryptHubSecret(values.lazyLibrarian, 'lazylibrarian-api-key');
   }
+  if (values.prowlarr) decryptHubSecret(values.prowlarr, 'prowlarr-api-key');
+  if (values.sabnzbd) decryptHubSecret(values.sabnzbd, 'sabnzbd-api-key');
   if (values.homeAssistant) {
     decryptHubSecret(values.homeAssistant, 'home-assistant-webhook');
   }

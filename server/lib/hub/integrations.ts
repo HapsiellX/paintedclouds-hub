@@ -1,7 +1,6 @@
 import { decryptHubSecret } from '@server/lib/hub/secrets';
 import { getSettings } from '@server/lib/settings';
 import axios from 'axios';
-import fs from 'fs';
 
 export interface HubServiceStatus {
   id: string;
@@ -11,13 +10,6 @@ export interface HubServiceStatus {
   queueSize?: number;
   error?: string;
 }
-
-const readSecret = (name: string): string | undefined => {
-  const direct = process.env[name];
-  if (direct) return direct;
-  const path = process.env[`${name}_FILE`];
-  return path ? fs.readFileSync(path, 'utf8').trim() : undefined;
-};
 
 export const integrationConfig = (id: string) => {
   const settings = getSettings();
@@ -36,6 +28,13 @@ export const integrationConfig = (id: string) => {
       ),
     };
   }
+  if (id === 'prowlarr' || id === 'sabnzbd') {
+    const service = settings.hub[id];
+    return {
+      url: service.url.replace(/\/$/, ''),
+      apiKey: decryptHubSecret(service.apiKey, `${id}-api-key`),
+    };
+  }
   if (id === 'radarr' || id === 'sonarr') {
     const service =
       settings[id].find((entry) => entry.isDefault) ?? settings[id][0];
@@ -49,11 +48,7 @@ export const integrationConfig = (id: string) => {
         }
       : { url: undefined, apiKey: undefined };
   }
-  const key = id.toUpperCase().replaceAll('-', '_');
-  return {
-    url: process.env[`HUB_${key}_URL`]?.replace(/\/$/, ''),
-    apiKey: readSecret(`HUB_${key}_API_KEY`),
-  };
+  return { url: undefined, apiKey: undefined };
 };
 
 const arrStatus = async (
@@ -70,6 +65,7 @@ const arrStatus = async (
     const client = axios.create({
       baseURL: `${url}/api/${apiVersion}`,
       timeout: 6_000,
+      maxRedirects: 0,
       headers: { 'X-Api-Key': apiKey },
     });
     const [status, queue] = await Promise.all([
@@ -103,6 +99,7 @@ const sabStatus = async (): Promise<HubServiceStatus> => {
   try {
     const response = await axios.get(`${url}/api`, {
       timeout: 6_000,
+      maxRedirects: 0,
       params: { mode: 'queue', output: 'json', apikey: apiKey },
     });
     return {
@@ -135,6 +132,7 @@ export const getStorageUsage = async (): Promise<{
   try {
     const response = await axios.get(`${url}/api/v3/diskspace`, {
       timeout: 6_000,
+      maxRedirects: 0,
       headers: { 'X-Api-Key': apiKey },
     });
     const disks = response.data as {

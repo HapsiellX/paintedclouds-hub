@@ -14,6 +14,7 @@ export enum HubRequestFormat {
 export enum HubRequestState {
   PENDING = 'pending',
   APPROVED = 'approved',
+  PROCESSING = 'processing',
   SUBMITTED = 'submitted',
   DOWNLOADING = 'downloading',
   IMPORTED = 'imported',

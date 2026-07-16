@@ -117,6 +117,8 @@ export interface HubSettings {
     metadataProfileId: number;
   };
   lazyLibrarian: HubServiceSettings;
+  prowlarr: HubServiceSettings;
+  sabnzbd: HubServiceSettings;
   homeAssistant: { webhookUrl?: HubSecretValue };
   metadata: { contactEmail: string; userAgent: string };
   defaults: {
@@ -503,7 +505,7 @@ class Settings {
       lidarr: [],
       hub: {
         enabled: true,
-        configurationVersion: 2,
+        configurationVersion: 3,
         environmentImported: false,
         lidarr: {
           url: '',
@@ -512,6 +514,8 @@ class Settings {
           metadataProfileId: 0,
         },
         lazyLibrarian: { url: '' },
+        prowlarr: { url: '' },
+        sabnzbd: { url: '' },
         homeAssistant: {},
         metadata: { contactEmail: '', userAgent: '' },
         defaults: { languages: ['de', 'en'], bookFormats: ['ebook'] },

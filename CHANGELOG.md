@@ -12,6 +12,21 @@ container digest, and rollback requirements.
 
 ## Unreleased
 
+### V0.3
+
+- Pointed the backend updater, release feed, About page, support links and
+  package metadata at the official PaintedClouds Hub GitHub repository.
+- Added robust tag-based semantic version checks and a cached authenticated
+  release-feed endpoint instead of direct browser calls to upstream GitHub.
+- Added encrypted first-class Prowlarr and SABnzbd settings with a one-time
+  V0.2 environment migration and connection tests.
+- Made the cross-media Hub the primary home, corrected movie/series navigation,
+  and added original cross-media artwork.
+- Added atomic request management transitions, bounded Activity enrichment,
+  redirect-safe credentialed integrations and explicit secret-key ignores.
+- Forked Helm metadata and installation trust anchors to the PaintedClouds
+  image, repository and signed release pipeline.
+
 ### V0.2
 
 - Added encrypted Admin-UI configuration with one-time V0.1 environment import.
