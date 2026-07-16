@@ -1,3 +1,4 @@
+import useLocale from '@app/hooks/useLocale';
 import { Permission, useUser } from '@app/hooks/useUser';
 import {
   BookOpenIcon,
@@ -26,13 +27,24 @@ interface CatalogItem {
 }
 
 interface HubRequest {
-  id: number;
+  id: number | string;
+  source?: 'hub' | 'seerr';
+  sourceId?: number;
   kind: HubKind;
   title: string;
   subtitle?: string;
   state: string;
   errorMessage?: string;
   requestedBy?: { displayName: string };
+}
+
+interface HubHistoryEvent {
+  id: number;
+  action: string;
+  createdAt: string;
+  from?: string;
+  to?: string;
+  actor?: { displayName: string };
 }
 
 interface Overview {
@@ -48,7 +60,7 @@ interface Overview {
   requests: HubRequest[];
 }
 
-const kindLabels: Record<HubKind, string> = {
+const kindLabelsDe: Record<HubKind, string> = {
   movie: 'Film',
   tv: 'Serie',
   music_artist: 'Künstler',
@@ -56,7 +68,15 @@ const kindLabels: Record<HubKind, string> = {
   book: 'Buch',
 };
 
-const stateLabels: Record<string, string> = {
+const kindLabelsEn: Record<HubKind, string> = {
+  movie: 'Movie',
+  tv: 'Series',
+  music_artist: 'Artist',
+  music_album: 'Album',
+  book: 'Book',
+};
+
+const stateLabelsDe: Record<string, string> = {
   pending: 'Freigabe nötig',
   approved: 'Freigegeben',
   submitted: 'Übermittelt',
@@ -68,7 +88,25 @@ const stateLabels: Record<string, string> = {
   cancelled: 'Abgebrochen',
 };
 
-const allKinds = Object.keys(kindLabels) as HubKind[];
+const stateLabelsEn: Record<string, string> = {
+  pending: 'Approval required',
+  approved: 'Approved',
+  submitted: 'Submitted',
+  downloading: 'Downloading',
+  imported: 'Imported',
+  available: 'Available',
+  failed: 'Failed',
+  declined: 'Declined',
+  cancelled: 'Cancelled',
+};
+
+const allKinds: HubKind[] = [
+  'movie',
+  'tv',
+  'music_artist',
+  'music_album',
+  'book',
+];
 
 const parseKinds = (value: string | string[] | undefined): HubKind[] => {
   const requested = (Array.isArray(value) ? value.join(',') : (value ?? ''))
@@ -78,6 +116,10 @@ const parseKinds = (value: string | string[] | undefined): HubKind[] => {
 };
 
 const HubPage: NextPage = () => {
+  const { locale } = useLocale();
+  const tr = (de: string, en: string) => (locale === 'de' ? de : en);
+  const kindLabels = locale === 'de' ? kindLabelsDe : kindLabelsEn;
+  const stateLabels = locale === 'de' ? stateLabelsDe : stateLabelsEn;
   const router = useRouter();
   const { hasPermission } = useUser();
   const admin = hasPermission(Permission.ADMIN);
@@ -85,6 +127,10 @@ const HubPage: NextPage = () => {
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [kinds, setKinds] = useState<HubKind[]>(allKinds);
   const [message, setMessage] = useState<string>();
+  const [activityKind, setActivityKind] = useState('');
+  const [activityState, setActivityState] = useState('');
+  const [activityQuery, setActivityQuery] = useState('');
+  const [historyRequestId, setHistoryRequestId] = useState<number>();
   const searchUrl = useMemo(
     () =>
       submittedQuery
@@ -103,6 +149,34 @@ const HubPage: NextPage = () => {
   const { data: overview, mutate: refreshOverview } = useSWR<Overview>(
     '/api/v1/hub/overview',
     { refreshInterval: 30_000 }
+  );
+  const { data: quota, mutate: refreshQuota } = useSWR<{
+    enabled: boolean;
+    limit: number;
+    used: number;
+    reserved: number;
+    remaining: number;
+    windowDays: number;
+  }>('/api/v1/hub/quota');
+  const { data: activity, mutate: refreshActivity } = useSWR<{
+    results: HubRequest[];
+  }>(
+    `/api/v1/hub/activity?take=30&kinds=${encodeURIComponent(activityKind)}&states=${encodeURIComponent(activityState)}&query=${encodeURIComponent(activityQuery)}`,
+    { refreshInterval: 30_000 }
+  );
+  const { data: reconciliation, mutate: refreshReconciliation } = useSWR<{
+    running: boolean;
+    lastCompletedAt?: string;
+    checked: number;
+    changed: number;
+    failed: number;
+  }>(admin ? '/api/v1/hub/reconciliation' : null, {
+    refreshInterval: 15_000,
+  });
+  const { data: history, isLoading: historyLoading } = useSWR<{
+    results: HubHistoryEvent[];
+  }>(
+    historyRequestId ? `/api/v1/hub/requests/${historyRequestId}/history` : null
   );
 
   useEffect(() => {
@@ -141,14 +215,22 @@ const HubPage: NextPage = () => {
       setMessage(
         response.data.state === 'failed'
           ? response.data.errorMessage
-          : `${item.title} wurde als Wunsch aufgenommen.`
+          : tr(
+              `${item.title} wurde als Wunsch aufgenommen.`,
+              `${item.title} was added as a request.`
+            )
       );
       await refreshOverview();
+      await refreshActivity();
+      await refreshQuota();
     } catch (error) {
       setMessage(
         axios.isAxiosError(error)
           ? (error.response?.data?.message ?? error.message)
-          : 'Der Wunsch konnte nicht gespeichert werden.'
+          : tr(
+              'Der Wunsch konnte nicht gespeichert werden.',
+              'The request could not be saved.'
+            )
       );
     }
   };
@@ -157,8 +239,26 @@ const HubPage: NextPage = () => {
     request: HubRequest,
     action: 'approve' | 'retry'
   ) => {
-    await axios.post(`/api/v1/hub/requests/${request.id}/${action}`);
+    await axios.post(
+      `/api/v1/hub/requests/${request.sourceId ?? request.id}/${action}`
+    );
     await refreshOverview();
+    await refreshActivity();
+  };
+
+  const runReconciliation = async () => {
+    setMessage(undefined);
+    try {
+      await axios.post('/api/v1/hub/reconciliation');
+      await Promise.all([refreshReconciliation(), refreshActivity()]);
+      setMessage(
+        tr('Statusabgleich abgeschlossen.', 'Status reconciliation completed.')
+      );
+    } catch {
+      setMessage(
+        tr('Statusabgleich fehlgeschlagen.', 'Status reconciliation failed.')
+      );
+    }
   };
 
   return (
@@ -168,11 +268,16 @@ const HubPage: NextPage = () => {
           PaintedClouds Hub
         </p>
         <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl">
-          Eine Suche für deine gesamte Medienwelt
+          {tr(
+            'Eine Suche für deine gesamte Medienwelt',
+            'One search for your entire media world'
+          )}
         </h1>
         <p className="mt-3 max-w-3xl text-gray-300">
-          Filme, Serien, Anime, Musik, E-Books und Hörbücher suchen, wünschen
-          und bis zum Import verfolgen.
+          {tr(
+            'Filme, Serien, Anime, Musik, E-Books und Hörbücher suchen, wünschen und bis zum Import verfolgen.',
+            'Search and request movies, series, anime, music, e-books, and audiobooks, then track them through import.'
+          )}
         </p>
         <form
           className="mt-6 flex flex-col gap-3 sm:flex-row"
@@ -197,8 +302,11 @@ const HubPage: NextPage = () => {
             className="min-w-0 flex-1 rounded-lg border border-gray-600 bg-gray-950/80 px-4 py-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Titel, Autor, Künstler oder Album …"
-            aria-label="Medien durchsuchen"
+            placeholder={tr(
+              'Titel, Autor, Künstler oder Album …',
+              'Title, author, artist, or album…'
+            )}
+            aria-label={tr('Medien durchsuchen', 'Search media')}
           />
           <button
             data-testid="hub-search-submit"
@@ -206,7 +314,7 @@ const HubPage: NextPage = () => {
             type="submit"
             disabled={query.trim().length < 2 || !kinds.length}
           >
-            Suchen
+            {tr('Suchen', 'Search')}
           </button>
         </form>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -225,6 +333,14 @@ const HubPage: NextPage = () => {
             </button>
           ))}
         </div>
+        {quota?.enabled && (
+          <p className="mt-4 text-sm text-indigo-200">
+            {tr(
+              `${quota.remaining} von ${quota.limit} Punkten in ${quota.windowDays} Tagen verfügbar`,
+              `${quota.remaining} of ${quota.limit} points available over ${quota.windowDays} days`
+            )}
+          </p>
+        )}
       </header>
 
       {message && (
@@ -236,19 +352,25 @@ const HubPage: NextPage = () => {
       {(searching || search || searchError) && (
         <section data-testid="hub-search-results">
           <h2 className="mb-4 text-2xl font-semibold text-white">
-            Suchergebnisse
+            {tr('Suchergebnisse', 'Search results')}
           </h2>
           {searching ? (
-            <p className="text-gray-400">Kataloge werden durchsucht …</p>
+            <p className="text-gray-400">
+              {tr('Kataloge werden durchsucht …', 'Searching catalogs…')}
+            </p>
           ) : searchError ? (
             <div className="rounded-lg border border-red-500/30 bg-red-950/40 p-4 text-red-200">
-              Die Suche konnte nicht ausgeführt werden. Bitte versuche es noch
-              einmal.
+              {tr(
+                'Die Suche konnte nicht ausgeführt werden. Bitte versuche es erneut.',
+                'The search failed. Please try again.'
+              )}
             </div>
           ) : search?.results.length === 0 ? (
             <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 text-gray-300">
-              Keine passenden Ergebnisse gefunden. Prüfe die ausgewählten
-              Medientypen oder versuche einen anderen Suchbegriff.
+              {tr(
+                'Keine passenden Ergebnisse gefunden. Prüfe die ausgewählten Medientypen oder versuche einen anderen Suchbegriff.',
+                'No matching results were found. Check the selected media types or try another search term.'
+              )}
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -280,37 +402,21 @@ const HubPage: NextPage = () => {
                           .join(' · ') || 'Keine Zusatzangaben'}
                       </p>
                     </div>
-                    {item.kind === 'book' ? (
-                      <div className="grid grid-cols-3 gap-1 text-xs">
-                        <button
-                          className="rounded bg-indigo-600 px-2 py-2 text-white hover:bg-indigo-500"
-                          onClick={() => requestItem(item, ['ebook'])}
-                        >
-                          E-Book
-                        </button>
-                        <button
-                          className="rounded bg-indigo-600 px-2 py-2 text-white hover:bg-indigo-500"
-                          onClick={() => requestItem(item, ['audiobook'])}
-                        >
-                          Hörbuch
-                        </button>
-                        <button
-                          className="rounded bg-indigo-600 px-2 py-2 text-white hover:bg-indigo-500"
-                          onClick={() =>
-                            requestItem(item, ['ebook', 'audiobook'])
-                          }
-                        >
-                          Beides
-                        </button>
-                      </div>
-                    ) : (
+                    {item.kind === 'movie' || item.kind === 'tv' ? (
                       <button
                         className="w-full rounded bg-indigo-600 px-3 py-2 font-medium text-white hover:bg-indigo-500"
                         onClick={() => requestItem(item)}
                       >
-                        {item.kind === 'movie' || item.kind === 'tv'
-                          ? 'Details & Wunsch'
-                          : 'Wünschen'}
+                        {tr('Details & Wunsch', 'Details & request')}
+                      </button>
+                    ) : (
+                      <button
+                        className="w-full rounded bg-indigo-600 px-3 py-2 font-medium text-white hover:bg-indigo-500"
+                        onClick={() =>
+                          router.push(`/hub/${item.kind}/${item.externalId}`)
+                        }
+                      >
+                        {tr('Details & Wunsch', 'Details & request')}
                       </button>
                     )}
                   </div>
@@ -320,17 +426,35 @@ const HubPage: NextPage = () => {
           )}
           {!!search?.errors.length && (
             <p className="mt-3 text-sm text-amber-300">
-              Einzelne Kataloge waren vorübergehend nicht erreichbar; vorhandene
-              Treffer werden trotzdem angezeigt.
+              {tr(
+                'Einzelne Kataloge waren vorübergehend nicht erreichbar; vorhandene Treffer werden trotzdem angezeigt.',
+                'Some catalogs were temporarily unavailable; available results are still shown.'
+              )}
             </p>
           )}
         </section>
       )}
 
       <section>
-        <div className="mb-4 flex items-center gap-2">
-          <ServerStackIcon className="h-6 w-6 text-indigo-300" />
-          <h2 className="text-2xl font-semibold text-white">Systemzustand</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ServerStackIcon className="h-6 w-6 text-indigo-300" />
+            <h2 className="text-2xl font-semibold text-white">
+              {tr('Systemzustand', 'System status')}
+            </h2>
+          </div>
+          {admin && (
+            <button
+              type="button"
+              disabled={reconciliation?.running}
+              onClick={runReconciliation}
+              className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:opacity-50"
+            >
+              {reconciliation?.running
+                ? tr('Abgleich läuft …', 'Reconciling…')
+                : tr('Jetzt abgleichen', 'Reconcile now')}
+            </button>
+          )}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {overview?.services.map((service) => (
@@ -353,69 +477,175 @@ const HubPage: NextPage = () => {
           ))}
           <div className="rounded-xl border border-gray-700 bg-gray-800/60 p-4">
             <div className="flex items-center gap-2 font-semibold text-white">
-              <CircleStackIcon className="h-5 w-5 text-indigo-300" /> Speicher
+              <CircleStackIcon className="h-5 w-5 text-indigo-300" />{' '}
+              {tr('Speicher', 'Storage')}
             </div>
             <p className="mt-2 text-sm text-gray-400">
               {overview?.storage.usedPercent === undefined
-                ? 'Noch keine Speicherdaten'
-                : `${overview.storage.usedPercent} % belegt`}
+                ? tr('Noch keine Speicherdaten', 'No storage data yet')
+                : tr(
+                    `${overview.storage.usedPercent} % belegt`,
+                    `${overview.storage.usedPercent}% used`
+                  )}
             </p>
           </div>
         </div>
       </section>
 
       <section>
-        <h2 className="mb-4 text-2xl font-semibold text-white">
-          Letzte Wünsche
-        </h2>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <h2 className="text-2xl font-semibold text-white">
+            {tr('Alle Wünsche', 'All requests')}
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <input
+              className="rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white"
+              value={activityQuery}
+              onChange={(event) => setActivityQuery(event.target.value)}
+              placeholder={tr('Wünsche filtern …', 'Filter requests…')}
+            />
+            <select
+              className="rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white"
+              value={activityKind}
+              onChange={(event) => setActivityKind(event.target.value)}
+            >
+              <option value="">
+                {tr('Alle Medientypen', 'All media types')}
+              </option>
+              {allKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {kindLabels[kind]}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white"
+              value={activityState}
+              onChange={(event) => setActivityState(event.target.value)}
+            >
+              <option value="">{tr('Alle Status', 'All statuses')}</option>
+              {Object.entries(stateLabels).map(([state, label]) => (
+                <option key={state} value={state}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div className="overflow-hidden rounded-xl border border-gray-700 bg-gray-800/60">
-          {overview?.requests.length ? (
-            overview.requests.map((request) => (
-              <div
-                key={request.id}
-                className="flex flex-col gap-3 border-b border-gray-700 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-medium text-white">{request.title}</p>
-                  <p className="text-sm text-gray-400">
-                    {kindLabels[request.kind]} ·{' '}
-                    {stateLabels[request.state] ?? request.state}
-                    {request.errorMessage ? ` · ${request.errorMessage}` : ''}
-                  </p>
+          {activity?.results.length ? (
+            activity.results.map((request) => {
+              const sourceId = request.sourceId ?? Number(request.id);
+              const historyOpen =
+                request.source !== 'seerr' && historyRequestId === sourceId;
+              return (
+                <div
+                  key={request.id}
+                  className="border-b border-gray-700 px-4 py-3 last:border-b-0"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium text-white">{request.title}</p>
+                      <p className="text-sm text-gray-400">
+                        {kindLabels[request.kind]} ·{' '}
+                        {stateLabels[request.state] ?? request.state}
+                        {request.errorMessage
+                          ? ` · ${request.errorMessage}`
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {request.source !== 'seerr' && (
+                        <button
+                          type="button"
+                          className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600"
+                          aria-expanded={historyOpen}
+                          onClick={() =>
+                            setHistoryRequestId(
+                              historyOpen ? undefined : sourceId
+                            )
+                          }
+                        >
+                          {historyOpen
+                            ? tr('Verlauf schließen', 'Close history')
+                            : tr('Verlauf', 'History')}
+                        </button>
+                      )}
+                      {admin &&
+                        request.source !== 'seerr' &&
+                        ['pending', 'failed'].includes(request.state) && (
+                          <button
+                            className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600"
+                            onClick={() =>
+                              requestAction(
+                                request,
+                                request.state === 'pending'
+                                  ? 'approve'
+                                  : 'retry'
+                              )
+                            }
+                          >
+                            {request.state === 'pending'
+                              ? tr('Freigeben', 'Approve')
+                              : tr('Erneut versuchen', 'Retry')}
+                          </button>
+                        )}
+                    </div>
+                  </div>
+                  {historyOpen && (
+                    <div className="mt-3 rounded-lg bg-gray-900/70 p-3 text-sm text-gray-300">
+                      {historyLoading ? (
+                        <p>
+                          {tr('Verlauf wird geladen …', 'Loading history…')}
+                        </p>
+                      ) : history?.results.length ? (
+                        <ol className="space-y-2">
+                          {history.results.map((event) => (
+                            <li key={event.id}>
+                              <time className="text-gray-500">
+                                {new Intl.DateTimeFormat(locale, {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                }).format(new Date(event.createdAt))}
+                              </time>{' '}
+                              ·{' '}
+                              {event.action === 'state_changed'
+                                ? `${stateLabels[event.from ?? ''] ?? event.from} → ${stateLabels[event.to ?? ''] ?? event.to}`
+                                : event.action.replaceAll('_', ' ')}
+                              {event.actor
+                                ? ` · ${event.actor.displayName}`
+                                : ''}
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p>{tr('Noch kein Verlauf.', 'No history yet.')}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {admin && ['pending', 'failed'].includes(request.state) && (
-                  <button
-                    className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600"
-                    onClick={() =>
-                      requestAction(
-                        request,
-                        request.state === 'pending' ? 'approve' : 'retry'
-                      )
-                    }
-                  >
-                    {request.state === 'pending'
-                      ? 'Freigeben'
-                      : 'Erneut versuchen'}
-                  </button>
-                )}
-              </div>
-            ))
+              );
+            })
           ) : (
-            <p className="p-4 text-gray-400">Noch keine erweiterten Wünsche.</p>
+            <p className="p-4 text-gray-400">
+              {tr('Noch keine Wünsche.', 'No requests yet.')}
+            </p>
           )}
         </div>
       </section>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-3 rounded-xl border border-gray-800 p-4 text-gray-300">
-          <FilmIcon className="h-6 w-6 text-indigo-300" /> Film, Serie & Anime
+          <FilmIcon className="h-6 w-6 text-indigo-300" />{' '}
+          {tr('Film, Serie & Anime', 'Movies, series & anime')}
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-gray-800 p-4 text-gray-300">
-          <MusicalNoteIcon className="h-6 w-6 text-indigo-300" /> Album &
-          Künstler
+          <MusicalNoteIcon className="h-6 w-6 text-indigo-300" />{' '}
+          {tr('Album & Künstler', 'Albums & artists')}
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-gray-800 p-4 text-gray-300">
-          <BookOpenIcon className="h-6 w-6 text-indigo-300" /> E-Book & Hörbuch
+          <BookOpenIcon className="h-6 w-6 text-indigo-300" />{' '}
+          {tr('E-Book & Hörbuch', 'E-books & audiobooks')}
         </div>
       </div>
     </div>

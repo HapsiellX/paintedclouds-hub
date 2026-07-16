@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Prerelease version, for example v0.1.0-alpha.1
+        description: Candidate version, for example v0.2.0-rc.1 or v0.2.0
         required: true
         type: string
       candidate_sha:
@@ -48,8 +48,8 @@ jobs:
           VERSION: ${{ inputs.version }}
           WORKFLOW_SHA: ${{ github.sha }}
         run: |
-          if [[ ! "$VERSION" =~ ^v0\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
-            echo 'Only v0.x.y-alpha.n and v0.x.y-beta.n prereleases are allowed' >&2
+          if [[ ! "$VERSION" =~ ^v0\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
+            echo 'Only v0.x.y and v0.x.y-alpha.n, beta.n, or rc.n versions are allowed' >&2
             exit 1
           fi
           if [[ ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then

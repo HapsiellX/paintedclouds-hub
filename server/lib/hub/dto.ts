@@ -20,6 +20,7 @@ export interface HubRequestDto {
   kind: HubMediaKind;
   provider: string;
   externalId: string;
+  editionId?: string | null;
   title: string;
   subtitle?: string | null;
   imageUrl?: string | null;
@@ -33,6 +34,7 @@ export interface HubRequestDto {
   approvedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  lastSyncedAt?: Date | null;
   targetService?: string | null;
   targetId?: string | null;
 }
@@ -51,6 +53,7 @@ export const toHubRequestDto = (
   kind: request.kind,
   provider: request.provider,
   externalId: request.externalId,
+  editionId: request.editionId,
   title: request.title,
   subtitle: request.subtitle,
   imageUrl: request.imageUrl,
@@ -66,6 +69,7 @@ export const toHubRequestDto = (
   approvedAt: request.approvedAt,
   createdAt: request.createdAt,
   updatedAt: request.updatedAt,
+  lastSyncedAt: request.lastSyncedAt,
   ...(options.admin
     ? {
         approvedBy: request.approvedBy

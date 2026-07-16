@@ -8266,6 +8266,65 @@ paths:
       tags: [hub]
       responses:
         '200': { description: Hub overview }
+  /hub/quota:
+    get:
+      summary: Get the current user's rolling Hub points budget
+      tags: [hub]
+      responses:
+        '200': { description: Hub quota status }
+  /hub/preferences:
+    get:
+      summary: Get non-sensitive Hub request defaults
+      tags: [hub]
+      responses:
+        '200': { description: Default languages and book formats }
+  /hub/activity:
+    get:
+      summary: List unified Seerr and Hub request activity
+      tags: [hub]
+      parameters:
+        - in: query
+          name: take
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - in: query
+          name: skip
+          schema: { type: integer, minimum: 0 }
+        - in: query
+          name: kinds
+          description: Comma-separated media kinds
+          schema: { type: string }
+        - in: query
+          name: states
+          description: Comma-separated normalized Hub states
+          schema: { type: string }
+        - in: query
+          name: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: Paginated unified activity }
+  /hub/items/{kind}/{provider}/{externalId}:
+    get:
+      summary: Resolve canonical artist, album, work and edition details
+      tags: [hub]
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema: { type: string, enum: [music_artist, music_album, book] }
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [musicbrainz, openlibrary] }
+        - in: path
+          name: externalId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          {
+            description: Canonical catalog detail with related items and editions,
+          }
+        '404': { description: Catalog item not found }
   /hub/discover/{section}:
     get:
       summary: Get curated PaintedClouds music or book shelves
@@ -8287,6 +8346,9 @@ paths:
         - in: query
           name: take
           schema: { type: integer, minimum: 1, maximum: 250 }
+        - in: query
+          name: skip
+          schema: { type: integer, minimum: 0 }
       responses:
         '200': { description: Hub request list }
     post:
@@ -8308,6 +8370,9 @@ paths:
                   type: string
                   enum: [musicbrainz, openlibrary]
                 externalId: { type: string, minLength: 1, maxLength: 128 }
+                editionId:
+                  type: string
+                  pattern: '^OL\d+M$'
                 title: { type: string, minLength: 1, maxLength: 500 }
                 subtitle: { type: string, maxLength: 500 }
                 imageUrl: { type: string, format: uri, maxLength: 2000 }
@@ -8331,6 +8396,18 @@ paths:
           schema: { type: integer }
       responses:
         '200': { description: Approved request }
+  /hub/requests/{id}/history:
+    get:
+      summary: Get the sanitized state history for a visible Hub request
+      tags: [hub]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Chronological request history }
+        '404': { description: Request not visible or not found }
   /hub/requests/{id}/retry:
     post:
       summary: Retry a failed Hub request
@@ -8361,6 +8438,47 @@ paths:
                 reason: { type: string, maxLength: 500 }
       responses:
         '200': { description: Declined request }
+  /hub/reconciliation:
+    get:
+      summary: Get Hub reconciliation job status
+      tags: [hub]
+      responses:
+        '200': { description: Current and most recent job state }
+    post:
+      summary: Reconcile all active Hub requests or one request
+      tags: [hub]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                requestId: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Reconciliation result }
+  /settings/hub:
+    get:
+      summary: Get sanitized Hub administration settings
+      tags: [settings]
+      responses:
+        '200': { description: Hub settings without secret values }
+    put:
+      summary: Update Hub administration settings
+      tags: [settings]
+      responses:
+        '200': { description: Updated sanitized Hub settings }
+  /settings/hub/test/{service}:
+    post:
+      summary: Test a configured Hub acquisition service
+      tags: [settings]
+      parameters:
+        - in: path
+          name: service
+          required: true
+          schema: { type: string, enum: [lidarr, lazylibrarian] }
+      responses:
+        '200': { description: Connection succeeded }
 security:
   - cookieAuth: []
   - apiKey: []

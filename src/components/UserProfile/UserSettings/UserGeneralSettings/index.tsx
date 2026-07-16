@@ -58,6 +58,7 @@ const messages = defineMessages(
     streamingRegionTip: 'Show streaming sites by regional availability',
     movierequestlimit: 'Movie Request Limit',
     seriesrequestlimit: 'Series Request Limit',
+    hubrequestlimit: 'Hub Points Limit',
     enableOverride: 'Override Global Limit',
     applanguage: 'Display Language',
     languageDefault: 'Default ({language})',
@@ -78,6 +79,7 @@ const UserGeneralSettings = () => {
   const { locale, setLocale } = useLocale();
   const [movieQuotaEnabled, setMovieQuotaEnabled] = useState(false);
   const [tvQuotaEnabled, setTvQuotaEnabled] = useState(false);
+  const [hubQuotaEnabled, setHubQuotaEnabled] = useState(false);
   const router = useRouter();
   const {
     user,
@@ -124,6 +126,9 @@ const UserGeneralSettings = () => {
     setTvQuotaEnabled(
       data?.tvQuotaLimit != undefined && data?.tvQuotaDays != undefined
     );
+    setHubQuotaEnabled(
+      data?.hubQuotaLimit != undefined && data?.hubQuotaDays != undefined
+    );
   }, [data]);
 
   if (!data && !error) {
@@ -159,6 +164,8 @@ const UserGeneralSettings = () => {
           movieQuotaDays: data?.movieQuotaDays,
           tvQuotaLimit: data?.tvQuotaLimit,
           tvQuotaDays: data?.tvQuotaDays,
+          hubQuotaLimit: data?.hubQuotaLimit,
+          hubQuotaDays: data?.hubQuotaDays,
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
         }}
@@ -180,6 +187,8 @@ const UserGeneralSettings = () => {
               movieQuotaDays: movieQuotaEnabled ? values.movieQuotaDays : null,
               tvQuotaLimit: tvQuotaEnabled ? values.tvQuotaLimit : null,
               tvQuotaDays: tvQuotaEnabled ? values.tvQuotaDays : null,
+              hubQuotaLimit: hubQuotaEnabled ? values.hubQuotaLimit : null,
+              hubQuotaDays: hubQuotaEnabled ? values.hubQuotaDays : null,
               watchlistSyncMovies: values.watchlistSyncMovies,
               watchlistSyncTv: values.watchlistSyncTv,
             });
@@ -498,6 +507,65 @@ const UserGeneralSettings = () => {
                                 : undefined
                             }
                           />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <label htmlFor="hubQuotaLimit" className="text-label">
+                        <span>
+                          {intl.formatMessage(messages.hubrequestlimit)}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <div className="flex flex-col gap-3">
+                          <label className="flex items-center text-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={hubQuotaEnabled}
+                              onChange={() =>
+                                setHubQuotaEnabled((enabled) => !enabled)
+                              }
+                            />
+                            <span className="ml-2">
+                              {intl.formatMessage(messages.enableOverride)}
+                            </span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <label
+                              htmlFor="hubQuotaLimit"
+                              className="text-sm text-gray-400"
+                            >
+                              Points
+                              <Field
+                                type="number"
+                                min="0"
+                                name="hubQuotaLimit"
+                                id="hubQuotaLimit"
+                                disabled={!hubQuotaEnabled}
+                                className="form-input-field"
+                                placeholder={String(
+                                  data?.globalHubQuotaLimit ?? 0
+                                )}
+                              />
+                            </label>
+                            <label
+                              htmlFor="hubQuotaDays"
+                              className="text-sm text-gray-400"
+                            >
+                              Days
+                              <Field
+                                type="number"
+                                min="1"
+                                name="hubQuotaDays"
+                                id="hubQuotaDays"
+                                disabled={!hubQuotaEnabled}
+                                className="form-input-field"
+                                placeholder={String(
+                                  data?.globalHubQuotaDays ?? 30
+                                )}
+                              />
+                            </label>
+                          </div>
                         </div>
                       </div>
                     </div>

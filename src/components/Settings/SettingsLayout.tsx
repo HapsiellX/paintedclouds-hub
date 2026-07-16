@@ -19,6 +19,7 @@ const messages = defineMessages('components.Settings', {
   menuJobs: 'Jobs & Cache',
   menuAbout: 'About',
   menuMetadataProviders: 'Metadata Providers',
+  menuHub: 'PaintedClouds Hub',
 });
 
 type SettingsLayoutProps = {
@@ -54,6 +55,11 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       text: intl.formatMessage(messages.menuServices),
       route: '/settings/services',
       regex: /^\/settings\/services/,
+    },
+    {
+      text: intl.formatMessage(messages.menuHub),
+      route: '/settings/hub',
+      regex: /^\/settings\/hub/,
     },
     {
       text: intl.formatMessage(messages.menuNetwork),

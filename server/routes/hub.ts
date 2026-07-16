@@ -1,21 +1,29 @@
 import {
+  HubCatalogItemNotFoundError,
   discoverHubBooks,
   discoverHubMusic,
-  HubCatalogItemNotFoundError,
+  resolveHubCatalogDetail,
   resolveHubCatalogItem,
   searchHubCatalog,
 } from '@server/api/hub/catalog';
+import TheMovieDb from '@server/api/themoviedb';
 import {
   HubMediaKind,
   HubRequestFormat,
-  hubRequestPoints,
   HubRequestState,
 } from '@server/constants/hub';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import { HubAuditEvent } from '@server/entity/HubAuditEvent';
 import { HubRequest } from '@server/entity/HubRequest';
+import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { submitHubRequest } from '@server/lib/hub/acquisition';
+import { withHubMetadataCache } from '@server/lib/hub/cache';
 import {
   HUB_SUBMISSION_FAILED_MESSAGE,
   toHubRequestDto,
@@ -26,12 +34,24 @@ import {
 } from '@server/lib/hub/integrations';
 import { notifyHomeAssistant } from '@server/lib/hub/notifications';
 import {
+  configuredHubRequestPoints,
+  consumeHubQuota,
+  getHubQuotaStatus,
+  releaseHubQuota,
+  reserveHubQuota,
+} from '@server/lib/hub/quota';
+import {
   hubCatalogLimiter,
   hubCreateLimiter,
   hubManagementLimiter,
   hubReadLimiter,
 } from '@server/lib/hub/rateLimit';
+import {
+  getHubReconciliationStatus,
+  reconcileHubRequests,
+} from '@server/lib/hub/reconciliation';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { createHash } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
@@ -54,6 +74,11 @@ const requestSchema = z
     ]),
     provider: z.enum(['musicbrainz', 'openlibrary']),
     externalId: z.string().trim().min(1).max(128),
+    editionId: z
+      .string()
+      .trim()
+      .regex(/^OL\d+M$/i)
+      .optional(),
     title: z.string().trim().min(1).max(500),
     subtitle: z.string().trim().max(500).optional(),
     imageUrl: z.string().url().max(2_000).optional(),
@@ -114,6 +139,10 @@ const requestSchema = z
 
 const listSchema = z.object({
   take: z.coerce.number().int().min(1).max(250).default(100),
+  skip: z.coerce.number().int().min(0).default(0),
+  kinds: z.string().max(200).optional(),
+  states: z.string().max(300).optional(),
+  query: z.string().trim().max(200).optional(),
 });
 
 const idSchema = z.coerce.number().int().positive();
@@ -143,11 +172,6 @@ const addAudit = async (
   await getRepository(HubAuditEvent).save({ request, action, actor, details });
 };
 
-const canAutoApprove = (user: User): { allowed: boolean; reason?: string } => {
-  if (user.hasPermission(Permission.ADMIN)) return { allowed: true };
-  return { allowed: false, reason: 'Manuelle Freigabe erforderlich.' };
-};
-
 hubRoutes.get('/search', hubCatalogLimiter, async (req, res) => {
   const query = String(req.query.query ?? '').trim();
   if (query.length < 2 || query.length > 200) {
@@ -162,11 +186,19 @@ hubRoutes.get('/search', hubCatalogLimiter, async (req, res) => {
       allKinds.includes(kind as HubMediaKind)
     );
   try {
-    const results = await searchHubCatalog({
-      query,
-      kinds: requestedKinds.length ? requestedKinds : allKinds,
-      language: String(req.query.language ?? req.locale ?? 'de-DE'),
-    });
+    const language = String(req.query.language ?? req.locale ?? 'de-DE');
+    const selectedKinds = requestedKinds.length ? requestedKinds : allKinds;
+    const cacheKey = createHash('sha256')
+      .update(
+        `${query.toLowerCase()}:${selectedKinds.sort().join(',')}:${language}`
+      )
+      .digest('hex');
+    const results = await withHubMetadataCache(
+      'catalog',
+      `search:${cacheKey}`,
+      () => searchHubCatalog({ query, kinds: selectedKinds, language }),
+      6 * 60 * 60 * 1000
+    );
     return res.json(sanitizeCatalogResult(results));
   } catch {
     return res.status(502).json({ message: providerUnavailableMessage });
@@ -175,15 +207,66 @@ hubRoutes.get('/search', hubCatalogLimiter, async (req, res) => {
 
 hubRoutes.get('/discover/:section', hubCatalogLimiter, async (req, res) => {
   try {
+    const locale = String(req.locale ?? 'de');
     if (req.params.section === 'music')
-      return res.json(sanitizeCatalogResult(await discoverHubMusic()));
+      return res.json(
+        sanitizeCatalogResult(
+          await withHubMetadataCache(
+            'musicbrainz',
+            `discover:music:v2:${locale}`,
+            () => discoverHubMusic(locale),
+            6 * 60 * 60 * 1000
+          )
+        )
+      );
     if (req.params.section === 'books')
-      return res.json(sanitizeCatalogResult(await discoverHubBooks()));
+      return res.json(
+        sanitizeCatalogResult(
+          await withHubMetadataCache(
+            'openlibrary',
+            `discover:books:v2:${locale}`,
+            () => discoverHubBooks(locale),
+            6 * 60 * 60 * 1000
+          )
+        )
+      );
     return res.status(404).json({ message: 'Unbekannter Medienbereich.' });
   } catch {
     return res.status(502).json({ message: providerUnavailableMessage });
   }
 });
+
+hubRoutes.get(
+  '/items/:kind/:provider/:externalId',
+  hubCatalogLimiter,
+  async (req, res) => {
+    const identity = z
+      .object({
+        kind: z.enum([
+          HubMediaKind.MUSIC_ARTIST,
+          HubMediaKind.MUSIC_ALBUM,
+          HubMediaKind.BOOK,
+        ]),
+        provider: z.enum(['musicbrainz', 'openlibrary']),
+        externalId: z.string().min(1).max(128),
+      })
+      .safeParse(req.params);
+    if (!identity.success)
+      return res.status(400).json({ message: 'Ungültiger Katalogeintrag.' });
+    try {
+      const detail = await withHubMetadataCache(
+        identity.data.provider,
+        `detail:${identity.data.kind}:${identity.data.externalId.toLowerCase()}`,
+        () => resolveHubCatalogDetail(identity.data)
+      );
+      return res.json(detail);
+    } catch (error) {
+      if (error instanceof HubCatalogItemNotFoundError)
+        return res.sendStatus(404);
+      return res.status(502).json({ message: providerUnavailableMessage });
+    }
+  }
+);
 
 hubRoutes.get('/overview', hubReadLimiter, async (req, res) => {
   const user = req.user as User;
@@ -209,6 +292,30 @@ hubRoutes.get('/overview', hubReadLimiter, async (req, res) => {
   });
 });
 
+hubRoutes.get('/quota', hubReadLimiter, async (req, res) => {
+  return res.json(await getHubQuotaStatus(req.user as User));
+});
+
+hubRoutes.get('/preferences', hubReadLimiter, (_req, res) => {
+  return res.json(getSettings().hub.defaults);
+});
+
+hubRoutes.get('/reconciliation', hubManagementLimiter, (req, res) => {
+  if (!(req.user as User).hasPermission(Permission.ADMIN))
+    return res.sendStatus(403);
+  return res.json(getHubReconciliationStatus());
+});
+
+hubRoutes.post('/reconciliation', hubManagementLimiter, async (req, res) => {
+  if (!(req.user as User).hasPermission(Permission.ADMIN))
+    return res.sendStatus(403);
+  const id = req.body?.requestId
+    ? idSchema.safeParse(req.body.requestId)
+    : { success: true as const, data: undefined };
+  if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
+  return res.json(await reconcileHubRequests(id.data));
+});
+
 hubRoutes.get('/requests', hubReadLimiter, async (req, res) => {
   const user = req.user as User;
   const admin = user.hasPermission(Permission.ADMIN);
@@ -220,9 +327,162 @@ hubRoutes.get('/requests', hubReadLimiter, async (req, res) => {
     where: admin ? {} : { requestedBy: { id: user.id } },
     order: { createdAt: 'DESC' },
     take: parsed.data.take,
+    skip: parsed.data.skip,
   });
   return res.json({
     results: requests.map((item) => toHubRequestDto(item, { admin })),
+  });
+});
+
+hubRoutes.get('/requests/:id/history', hubReadLimiter, async (req, res) => {
+  const id = idSchema.safeParse(req.params.id);
+  if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
+  const user = req.user as User;
+  const admin = user.hasPermission(Permission.ADMIN);
+  const hubRequest = await getRepository(HubRequest).findOne({
+    where: admin
+      ? { id: id.data }
+      : { id: id.data, requestedBy: { id: user.id } },
+  });
+  if (!hubRequest) return res.sendStatus(404);
+  const events = await getRepository(HubAuditEvent).find({
+    where: { request: { id: hubRequest.id } },
+    relations: { actor: true },
+    order: { createdAt: 'ASC' },
+  });
+  return res.json({
+    results: events.map((event) => ({
+      id: event.id,
+      action: event.action,
+      createdAt: event.createdAt,
+      ...(admin && event.actor
+        ? {
+            actor: {
+              id: event.actor.id,
+              displayName: event.actor.displayName,
+              avatar: event.actor.avatar,
+            },
+          }
+        : {}),
+      ...(event.action === 'state_changed'
+        ? {
+            from: event.details?.from,
+            to: event.details?.to,
+          }
+        : {}),
+    })),
+  });
+});
+
+hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
+  const parsed = listSchema.safeParse(req.query);
+  if (!parsed.success)
+    return res.status(400).json({ message: 'Ungültige Seitengröße.' });
+  const user = req.user as User;
+  const admin = user.hasPermission(Permission.ADMIN);
+  const take = Math.min(parsed.data.take, 100);
+  const requestedKinds = new Set(
+    parsed.data.kinds
+      ?.split(',')
+      .filter((kind) =>
+        Object.values(HubMediaKind).includes(kind as HubMediaKind)
+      ) ?? []
+  );
+  const requestedStates = new Set(
+    parsed.data.states
+      ?.split(',')
+      .filter((state) =>
+        Object.values(HubRequestState).includes(state as HubRequestState)
+      ) ?? []
+  );
+  const activityQuery = parsed.data.query?.toLocaleLowerCase();
+  const [hubRequests, videoRequests] = await Promise.all([
+    getRepository(HubRequest).find({
+      where: admin ? {} : { requestedBy: { id: user.id } },
+      order: { createdAt: 'DESC' },
+      take: 500,
+    }),
+    getRepository(MediaRequest).find({
+      where: admin ? {} : { requestedBy: { id: user.id } },
+      order: { createdAt: 'DESC' },
+      take: 500,
+    }),
+  ]);
+  const tmdb = new TheMovieDb();
+  const video = await Promise.all(
+    videoRequests.map(async (request) => {
+      const detail = await (
+        request.type === MediaType.MOVIE
+          ? tmdb.getMovie({
+              movieId: request.media.tmdbId,
+              language: req.locale,
+            })
+          : tmdb.getTvShow({ tvId: request.media.tmdbId, language: req.locale })
+      ).catch(() => undefined);
+      const state =
+        request.status === MediaRequestStatus.PENDING
+          ? HubRequestState.PENDING
+          : request.status === MediaRequestStatus.DECLINED
+            ? HubRequestState.DECLINED
+            : request.status === MediaRequestStatus.FAILED
+              ? HubRequestState.FAILED
+              : request.media.status === MediaStatus.AVAILABLE
+                ? HubRequestState.AVAILABLE
+                : request.status === MediaRequestStatus.COMPLETED
+                  ? HubRequestState.IMPORTED
+                  : HubRequestState.SUBMITTED;
+      return {
+        id: `video:${request.id}`,
+        source: 'seerr' as const,
+        sourceId: request.id,
+        kind: request.type,
+        title:
+          detail && 'title' in detail
+            ? detail.title
+            : detail && 'name' in detail
+              ? detail.name
+              : `${request.type === MediaType.MOVIE ? 'Film' : 'Serie'} #${request.media.tmdbId}`,
+        imageUrl: detail?.poster_path
+          ? `https://image.tmdb.org/t/p/w500${detail.poster_path}`
+          : undefined,
+        state,
+        requestedBy: {
+          id: request.requestedBy.id,
+          displayName: request.requestedBy.displayName,
+          avatar: request.requestedBy.avatar,
+        },
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+      };
+    })
+  );
+  const hub = hubRequests.map((request) => ({
+    ...toHubRequestDto(request, { admin }),
+    id: `hub:${request.id}`,
+    source: 'hub' as const,
+    sourceId: request.id,
+  }));
+  const filtered = [...hub, ...video]
+    .filter((item) => !requestedKinds.size || requestedKinds.has(item.kind))
+    .filter((item) => !requestedStates.size || requestedStates.has(item.state))
+    .filter(
+      (item) =>
+        !activityQuery ||
+        item.title.toLocaleLowerCase().includes(activityQuery) ||
+        ('subtitle' in item &&
+          item.subtitle?.toLocaleLowerCase().includes(activityQuery))
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  const results = filtered.slice(parsed.data.skip, parsed.data.skip + take);
+  return res.json({
+    results,
+    take,
+    skip: parsed.data.skip,
+    total: filtered.length,
+    hasMore: parsed.data.skip + results.length < filtered.length,
   });
 });
 
@@ -245,7 +505,7 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
         ? [...new Set(body.formats)]
         : [HubRequestFormat.EBOOK]
       : [];
-  const points = hubRequestPoints(body.kind, formats);
+  const points = configuredHubRequestPoints(body.kind, formats);
   const target = body.kind === HubMediaKind.BOOK ? 'lazylibrarian' : 'lidarr';
   const idempotencyKey = createHash('sha256')
     .update(
@@ -264,12 +524,25 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
   }
 
   let catalogItem: Awaited<ReturnType<typeof resolveHubCatalogItem>>;
+  let canonicalIsbn: string | undefined;
   try {
     catalogItem = await resolveHubCatalogItem({
       kind: body.kind,
       provider: body.provider,
       externalId,
     });
+    if (body.editionId) {
+      const detail = await resolveHubCatalogDetail({
+        kind: body.kind,
+        provider: body.provider,
+        externalId,
+      });
+      const edition = detail.editions.find(
+        (candidate) => candidate.id === body.editionId?.toUpperCase()
+      );
+      if (!edition) throw new HubCatalogItemNotFoundError();
+      canonicalIsbn = edition.isbn[0];
+    }
   } catch (error) {
     if (error instanceof HubCatalogItemNotFoundError) {
       return res.status(422).json({
@@ -279,8 +552,6 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
     }
     return res.status(502).json({ message: providerUnavailableMessage });
   }
-  const approval = canAutoApprove(user);
-
   let request: HubRequest;
   try {
     request = await repository.save(
@@ -288,6 +559,8 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
         kind: catalogItem.kind,
         provider: catalogItem.provider,
         externalId: catalogItem.externalId,
+        editionId: body.editionId?.toUpperCase(),
+        isbn: canonicalIsbn,
         title: catalogItem.title,
         subtitle: catalogItem.subtitle,
         imageUrl: catalogItem.imageUrl,
@@ -296,13 +569,9 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
         points,
         targetService: target,
         requestedBy: user,
-        state: approval.allowed
-          ? HubRequestState.APPROVED
-          : HubRequestState.PENDING,
-        approvedBy: approval.allowed ? user : undefined,
-        approvedAt: approval.allowed ? new Date() : undefined,
+        state: HubRequestState.PENDING,
         idempotencyKey,
-        errorMessage: approval.reason,
+        errorMessage: 'Manuelle Freigabe erforderlich.',
       })
     );
   } catch {
@@ -319,6 +588,25 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
     if (duplicate) return res.status(409).json(duplicateResponse);
     return res.status(500).json({ message: requestFailedMessage });
   }
+  const quotaReservation = await reserveHubQuota(request, user);
+  const approval = {
+    allowed: quotaReservation.allowed,
+    reason: quotaReservation.allowed
+      ? undefined
+      : quotaReservation.status.enabled
+        ? 'Punktebudget ausgeschöpft; manuelle Freigabe erforderlich.'
+        : 'Automatische Freigabe ist deaktiviert.',
+  };
+  if (approval.allowed) {
+    request.state = HubRequestState.APPROVED;
+    request.approvedBy = user;
+    request.approvedAt = new Date();
+    request.errorMessage = null;
+    request = await repository.save(request);
+  } else {
+    request.errorMessage = approval.reason;
+    request = await repository.save(request);
+  }
   await addAudit(request, 'created', user, {
     autoApproved: approval.allowed,
     reason: approval.reason,
@@ -331,6 +619,7 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
   if (approval.allowed) {
     try {
       request = await repository.save(await submitHubRequest(request));
+      await consumeHubQuota(request.id);
       await addAudit(request, 'submitted', user, {
         target: request.targetService,
       });
@@ -347,6 +636,7 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
       request.state = HubRequestState.FAILED;
       request.errorMessage = HUB_SUBMISSION_FAILED_MESSAGE;
       request = await repository.save(request);
+      await releaseHubQuota(request.id);
       await addAudit(request, 'failed', user, {
         message: HUB_SUBMISSION_FAILED_MESSAGE,
       });

@@ -6,6 +6,7 @@ import { Session } from '@server/entity/Session';
 import { User } from '@server/entity/User';
 import { initI18n } from '@server/i18n';
 import { startJobs } from '@server/job/schedule';
+import { validateHubSecrets } from '@server/lib/hub/secrets';
 import notificationManager from '@server/lib/notifications';
 import DiscordAgent from '@server/lib/notifications/agents/discord';
 import EmailAgent from '@server/lib/notifications/agents/email';
@@ -82,6 +83,11 @@ app
 
     // Load Settings
     const settings = await getSettings().load();
+    validateHubSecrets({
+      lidarr: settings.hub.lidarr.apiKey,
+      lazyLibrarian: settings.hub.lazyLibrarian.apiKey,
+      homeAssistant: settings.hub.homeAssistant.webhookUrl,
+    });
     restartFlag.initializeSettings(settings);
 
     initI18n();

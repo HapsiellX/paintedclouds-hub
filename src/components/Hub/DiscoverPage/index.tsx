@@ -1,6 +1,6 @@
 import PageTitle from '@app/components/Common/PageTitle';
+import useLocale from '@app/hooks/useLocale';
 import { BookOpenIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -31,7 +31,7 @@ interface DiscoverResponse {
   errors: string[];
 }
 
-const sectionContent = {
+const sectionContentDe = {
   music: {
     title: 'Musik entdecken',
     eyebrow: 'Alben & Künstler',
@@ -50,11 +50,32 @@ const sectionContent = {
   },
 } as const;
 
+const sectionContentEn = {
+  music: {
+    title: 'Discover music',
+    eyebrow: 'Albums & artists',
+    description:
+      'Browse selected styles or search directly for artists and albums.',
+    placeholder: 'Search for an artist or album…',
+    kinds: 'music_artist,music_album',
+  },
+  books: {
+    title: 'Discover books & audiobooks',
+    eyebrow: 'Read & listen',
+    description: 'Popular titles and curated genres for your next story.',
+    placeholder: 'Search for a title or author…',
+    kinds: 'book',
+  },
+} as const;
+
 const DiscoverPage = ({ section }: { section: MediaSection }) => {
+  const { locale } = useLocale();
+  const tr = (de: string, en: string) => (locale === 'de' ? de : en);
   const router = useRouter();
-  const content = sectionContent[section];
+  const content = (locale === 'de' ? sectionContentDe : sectionContentEn)[
+    section
+  ];
   const [query, setQuery] = useState('');
-  const [message, setMessage] = useState<string>();
   const { data, error, isLoading } = useSWR<DiscoverResponse>(
     `/api/v1/hub/discover/${section}`,
     { revalidateOnFocus: false, dedupingInterval: 15 * 60 * 1_000 }
@@ -67,31 +88,6 @@ const DiscoverPage = ({ section }: { section: MediaSection }) => {
       pathname: '/hub',
       query: { query: normalized, kinds: content.kinds },
     });
-  };
-
-  const requestItem = async (
-    item: CatalogItem,
-    formats?: ('ebook' | 'audiobook')[]
-  ) => {
-    setMessage(undefined);
-    try {
-      const response = await axios.post('/api/v1/hub/requests', {
-        ...item,
-        formats,
-        languages: ['de', 'en'],
-      });
-      setMessage(
-        response.data.state === 'failed'
-          ? response.data.errorMessage
-          : `${item.title} wurde als Wunsch aufgenommen.`
-      );
-    } catch (requestError) {
-      setMessage(
-        axios.isAxiosError(requestError)
-          ? (requestError.response?.data?.message ?? requestError.message)
-          : 'Der Wunsch konnte nicht gespeichert werden.'
-      );
-    }
   };
 
   const Icon = section === 'music' ? MusicalNoteIcon : BookOpenIcon;
@@ -136,25 +132,24 @@ const DiscoverPage = ({ section }: { section: MediaSection }) => {
               disabled={query.trim().length < 2}
               className="rounded-xl bg-white px-6 py-3 font-semibold text-gray-950 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Suchen
+              {tr('Suchen', 'Search')}
             </button>
           </form>
         </div>
       </header>
 
-      {message && (
-        <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/50 px-4 py-3 text-indigo-100">
-          {message}
-        </div>
-      )}
-
       {error ? (
         <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-5 text-red-200">
-          Die Vorschläge konnten gerade nicht geladen werden. Die Suche oben
-          funktioniert weiterhin.
+          {tr(
+            'Die Vorschläge konnten gerade nicht geladen werden. Die Suche oben funktioniert weiterhin.',
+            'Suggestions could not be loaded. The search above is still available.'
+          )}
         </div>
       ) : isLoading ? (
-        <div className="space-y-8" aria-label="Vorschläge werden geladen">
+        <div
+          className="space-y-8"
+          aria-label={tr('Vorschläge werden geladen', 'Loading suggestions')}
+        >
           {[0, 1, 2].map((shelf) => (
             <div key={shelf}>
               <div className="mb-4 h-7 w-52 animate-pulse rounded bg-gray-800" />
@@ -220,40 +215,18 @@ const DiscoverPage = ({ section }: { section: MediaSection }) => {
                         <p className="mt-1 line-clamp-1 text-xs text-gray-400">
                           {[item.subtitle, item.year]
                             .filter(Boolean)
-                            .join(' · ') || 'Keine Zusatzangaben'}
+                            .join(' · ') ||
+                            tr('Keine Zusatzangaben', 'No additional details')}
                         </p>
                       </div>
-                      {section === 'music' ? (
-                        <button
-                          className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-                          onClick={() => requestItem(item)}
-                        >
-                          Album wünschen
-                        </button>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-1 text-xs">
-                          <button
-                            className="rounded-lg bg-indigo-600 px-2 py-2 text-white hover:bg-indigo-500"
-                            onClick={() => requestItem(item, ['ebook'])}
-                          >
-                            E-Book
-                          </button>
-                          <button
-                            className="rounded-lg bg-indigo-600 px-2 py-2 text-white hover:bg-indigo-500"
-                            onClick={() => requestItem(item, ['audiobook'])}
-                          >
-                            Hörbuch
-                          </button>
-                          <button
-                            className="col-span-2 rounded-lg bg-gray-700 px-2 py-2 text-white hover:bg-gray-600"
-                            onClick={() =>
-                              requestItem(item, ['ebook', 'audiobook'])
-                            }
-                          >
-                            Beides wünschen
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                        onClick={() =>
+                          router.push(`/hub/${item.kind}/${item.externalId}`)
+                        }
+                      >
+                        {tr('Details & Wunsch', 'Details & request')}
+                      </button>
                     </div>
                   </article>
                 ))}
@@ -262,8 +235,10 @@ const DiscoverPage = ({ section }: { section: MediaSection }) => {
           ))}
           {!!data?.errors.length && (
             <p className="rounded-lg border border-amber-500/20 bg-amber-950/30 p-3 text-sm text-amber-200">
-              Einzelne Vorschlagsreihen konnten vorübergehend nicht geladen
-              werden.
+              {tr(
+                'Einzelne Vorschlagsreihen konnten vorübergehend nicht geladen werden.',
+                'Some suggestion shelves could not be loaded temporarily.'
+              )}
             </p>
           )}
         </div>

@@ -33,6 +33,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
   async (req, res, next) => {
     const {
       main: { defaultQuotas },
+      hub,
     } = getSettings();
     const userRepository = getRepository(User);
 
@@ -56,6 +57,10 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
         movieQuotaDays: user.movieQuotaDays,
         tvQuotaLimit: user.tvQuotaLimit,
         tvQuotaDays: user.tvQuotaDays,
+        hubQuotaLimit: user.hubQuotaLimit,
+        hubQuotaDays: user.hubQuotaDays,
+        globalHubQuotaLimit: hub.quota.defaultPoints,
+        globalHubQuotaDays: hub.quota.windowDays,
         globalMovieQuotaDays: defaultQuotas.movie.quotaDays,
         globalMovieQuotaLimit: defaultQuotas.movie.quotaLimit,
         globalTvQuotaDays: defaultQuotas.tv.quotaDays,
@@ -116,6 +121,8 @@ userSettingsRoutes.post<
       user.movieQuotaLimit = req.body.movieQuotaLimit;
       user.tvQuotaDays = req.body.tvQuotaDays;
       user.tvQuotaLimit = req.body.tvQuotaLimit;
+      user.hubQuotaDays = req.body.hubQuotaDays;
+      user.hubQuotaLimit = req.body.hubQuotaLimit;
     }
 
     if (!user.settings) {

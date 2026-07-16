@@ -1,7 +1,7 @@
 # Support
 
-PaintedClouds Hub is community-maintained alpha software. Support is best-effort
-and no response or resolution time is guaranteed.
+PaintedClouds Hub is community-maintained software. Support is best-effort and
+no response or resolution time is guaranteed.
 
 PaintedClouds Hub is independent from Seerr. Do not ask the Seerr maintainers or
 community to diagnose fork-specific behavior. If a problem is confirmed to
@@ -10,7 +10,7 @@ cross-posting without context.
 
 ## Before Asking for Help
 
-1. Read the README, release notes, alpha limitations, and open issues.
+1. Read the README, release notes, supported scope, and open issues.
 2. Confirm that the problem occurs on the newest supported PaintedClouds Hub
    release.
 3. Check the health and logs of the relevant downstream service.

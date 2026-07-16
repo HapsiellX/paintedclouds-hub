@@ -45,6 +45,18 @@ jobs:
     timeout-minutes: 30
     container:
       image: node:22.22.2-alpine3.23@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+        env:
+          POSTGRES_USER: hub_test
+          POSTGRES_PASSWORD: hub_test
+          POSTGRES_DB: hub_test
+        options: >-
+          --health-cmd "pg_isready -U hub_test -d hub_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -72,6 +84,7 @@ jobs:
       - name: Unit tests
         env:
           CI: 'true'
+          HUB_TEST_POSTGRES_URL: postgres://hub_test:hub_test@postgres:5432/hub_test
         run: pnpm test
 
       - name: Production build

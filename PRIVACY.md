@@ -22,8 +22,9 @@ Depending on enabled features, the application can store:
   requested paths, service errors, media titles, and hostnames;
 - cached metadata, images, and avatars.
 
-API keys, webhook URLs, database credentials, and other secrets must be treated
-as sensitive even where the software supports file-mounted secrets.
+Hub API keys and webhook URLs are encrypted in `settings.json`; the matching
+`hub-secrets.key` decrypts them. Both files, database credentials, and all other
+application secrets remain sensitive and must be access-controlled together.
 
 ## External Services
 
@@ -48,13 +49,13 @@ the application or directly by a user's browser depending on configuration,
 which can disclose the browser's IP address and normal HTTP headers to the image
 provider.
 
-When configured, `HUB_METADATA_CONTACT_EMAIL` is deliberately transmitted as a
-contact identifier: it is included in the MusicBrainz User-Agent and sent to
-Open Library as the `email` request parameter. `HUB_METADATA_USER_AGENT` can
-explicitly replace the generated User-Agent and may itself contain contact
-information. Operators should use a monitored, role-based public address rather
-than a person's private address, inform affected administrators, and understand
-that providers can retain these values under their own policies.
+The metadata contact address configured in the Hub Admin UI is deliberately
+transmitted as a contact identifier: it is included in the MusicBrainz
+User-Agent and sent to Open Library as the `email` request parameter. A custom
+User-Agent may itself contain contact information. Operators should use a
+monitored, role-based public address rather than a person's private address,
+inform affected administrators, and understand that providers can retain these
+values under their own policies.
 
 Each external provider has its own privacy policy and terms. See
 [ATTRIBUTION.md](./ATTRIBUTION.md) for provider links.

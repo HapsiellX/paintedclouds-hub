@@ -10,10 +10,10 @@ import {
 } from '@server/constants/hub';
 import type { HubRequest } from '@server/entity/HubRequest';
 import { integrationConfig } from '@server/lib/hub/integrations';
+import { getSettings } from '@server/lib/settings';
 import axios from 'axios';
 
-const requiredNumber = (name: string): number => {
-  const value = Number(process.env[name]);
+const requiredNumber = (value: number, name: string): number => {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${name} ist nicht gültig konfiguriert`);
   }
@@ -22,14 +22,21 @@ const requiredNumber = (name: string): number => {
 
 const submitArtist = async (request: HubRequest): Promise<string> => {
   const { url, apiKey } = integrationConfig('lidarr');
+  const config = getSettings().hub.lidarr;
   if (!url || !apiKey) throw new Error('Lidarr ist nicht konfiguriert');
   const lidarr = new LidarrAPI({ url: `${url}/api/v1`, apiKey });
   const lookup = await lidarr.lookupArtist(request.externalId);
   const artist: LidarrArtist = {
     ...lookup,
-    rootFolderPath: process.env.HUB_LIDARR_ROOT ?? '/music',
-    qualityProfileId: requiredNumber('HUB_LIDARR_QUALITY_PROFILE_ID'),
-    metadataProfileId: requiredNumber('HUB_LIDARR_METADATA_PROFILE_ID'),
+    rootFolderPath: config.rootFolder,
+    qualityProfileId: requiredNumber(
+      config.qualityProfileId,
+      'Lidarr quality profile'
+    ),
+    metadataProfileId: requiredNumber(
+      config.metadataProfileId,
+      'Lidarr metadata profile'
+    ),
     monitored: true,
     monitorNewItems: 'all',
     tags: lookup.tags ?? [],
@@ -42,19 +49,25 @@ const submitArtist = async (request: HubRequest): Promise<string> => {
 
 const submitAlbum = async (request: HubRequest): Promise<string> => {
   const { url, apiKey } = integrationConfig('lidarr');
+  const config = getSettings().hub.lidarr;
   if (!url || !apiKey) throw new Error('Lidarr ist nicht konfiguriert');
   const lidarr = new LidarrAPI({ url: `${url}/api/v1`, apiKey });
   const lookup = (await lidarr.getAlbumByForeignAlbumId(
     request.externalId
   )) as unknown as LidarrAlbumOptions;
   lookup.monitored = true;
-  lookup.profileId = requiredNumber('HUB_LIDARR_QUALITY_PROFILE_ID');
-  lookup.artist.rootFolderPath = process.env.HUB_LIDARR_ROOT ?? '/music';
+  lookup.profileId = requiredNumber(
+    config.qualityProfileId,
+    'Lidarr quality profile'
+  );
+  lookup.artist.rootFolderPath = config.rootFolder;
   lookup.artist.qualityProfileId = requiredNumber(
-    'HUB_LIDARR_QUALITY_PROFILE_ID'
+    config.qualityProfileId,
+    'Lidarr quality profile'
   );
   lookup.artist.metadataProfileId = requiredNumber(
-    'HUB_LIDARR_METADATA_PROFILE_ID'
+    config.metadataProfileId,
+    'Lidarr metadata profile'
   );
   lookup.artist.monitored = false;
   lookup.artist.monitorNewItems = 'none';
@@ -81,7 +94,9 @@ const submitBook = async (request: HubRequest): Promise<string> => {
       params: { apikey: apiKey, cmd, ...params },
     });
   const found = await call('findBook', {
-    name: [request.title, request.subtitle].filter(Boolean).join(' '),
+    name:
+      request.isbn ??
+      [request.title, request.subtitle].filter(Boolean).join(' '),
   });
   const books: LazyLibrarianBook[] = Array.isArray(found.data)
     ? found.data

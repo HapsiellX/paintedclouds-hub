@@ -1,3 +1,5 @@
+import { decryptHubSecret } from '@server/lib/hub/secrets';
+import { getSettings } from '@server/lib/settings';
 import axios from 'axios';
 import fs from 'fs';
 
@@ -18,6 +20,35 @@ const readSecret = (name: string): string | undefined => {
 };
 
 export const integrationConfig = (id: string) => {
+  const settings = getSettings();
+  if (id === 'lidarr') {
+    return {
+      url: settings.hub.lidarr.url.replace(/\/$/, ''),
+      apiKey: decryptHubSecret(settings.hub.lidarr.apiKey, 'lidarr-api-key'),
+    };
+  }
+  if (id === 'lazylibrarian') {
+    return {
+      url: settings.hub.lazyLibrarian.url.replace(/\/$/, ''),
+      apiKey: decryptHubSecret(
+        settings.hub.lazyLibrarian.apiKey,
+        'lazylibrarian-api-key'
+      ),
+    };
+  }
+  if (id === 'radarr' || id === 'sonarr') {
+    const service =
+      settings[id].find((entry) => entry.isDefault) ?? settings[id][0];
+    return service
+      ? {
+          url: `${service.useSsl ? 'https' : 'http'}://${service.hostname}:${service.port}${service.baseUrl ?? ''}`.replace(
+            /\/$/,
+            ''
+          ),
+          apiKey: service.apiKey,
+        }
+      : { url: undefined, apiKey: undefined };
+  }
   const key = id.toUpperCase().replaceAll('-', '_');
   return {
     url: process.env[`HUB_${key}_URL`]?.replace(/\/$/, ''),

@@ -27,6 +27,12 @@ export class HubRequest {
   @Column({ type: 'varchar' })
   public externalId: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  public editionId?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public isbn?: string | null;
+
   @Column({ type: 'varchar' })
   public title: string;
 
@@ -56,6 +62,9 @@ export class HubRequest {
 
   @Column({ type: 'text', nullable: true })
   public errorMessage?: string | null;
+
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public lastSyncedAt?: Date | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar' })

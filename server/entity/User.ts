@@ -134,6 +134,12 @@ export class User {
   @Column({ nullable: true })
   public tvQuotaDays?: number;
 
+  @Column({ type: 'integer', nullable: true })
+  public hubQuotaLimit?: number;
+
+  @Column({ type: 'integer', nullable: true })
+  public hubQuotaDays?: number;
+
   @OneToOne(() => UserSettings, (settings) => settings.user, {
     cascade: true,
     eager: true,
