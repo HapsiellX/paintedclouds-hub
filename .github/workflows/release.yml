@@ -25,9 +25,6 @@ concurrency:
   group: promote-${{ inputs.version }}
   cancel-in-progress: false
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}
-
 jobs:
   promote:
     name: Verify and publish release
@@ -96,6 +93,7 @@ jobs:
           fi
           echo "image_version=${VERSION#v}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${CANDIDATE_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
           if [[ "$VERSION" == *-alpha.* ]]; then
             echo 'channel=alpha' >> "$GITHUB_OUTPUT"
             echo 'prerelease=true' >> "$GITHUB_OUTPUT"
@@ -123,6 +121,7 @@ jobs:
       - name: Require candidate tag to resolve to approved digest
         shell: bash
         env:
+          IMAGE: ${{ steps.release.outputs.image }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
           SHORT_SHA: ${{ steps.release.outputs.short_sha }}
         run: |
@@ -138,6 +137,7 @@ jobs:
 
       - name: Verify candidate signature and SBOM attestation
         env:
+          IMAGE: ${{ steps.release.outputs.image }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
         run: |
           identity="https://github.com/${{ github.repository }}/.github/workflows/release-candidate.yml@refs/heads/main"
@@ -157,6 +157,7 @@ jobs:
 
       - name: Re-scan immutable candidate and generate release SBOM
         env:
+          IMAGE: ${{ steps.release.outputs.image }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
         run: |
           trivy image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL \
@@ -166,6 +167,7 @@ jobs:
 
       - name: Promote exact digest to version and release channel
         env:
+          IMAGE: ${{ steps.release.outputs.image }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
           IMAGE_VERSION: ${{ steps.release.outputs.image_version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
@@ -181,6 +183,7 @@ jobs:
       - name: Publish GitHub release
         shell: bash
         env:
+          IMAGE: ${{ steps.release.outputs.image }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
