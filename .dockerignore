@@ -6,6 +6,7 @@
 .eslintrc.js
 .git
 .gitconfig
+.forgejo
 .github
 .gitignore
 .husky
@@ -13,9 +14,7 @@
 .prettierignore
 .vscode
 charts
-config/db/*
-config/logs/*
-config/*.json
+config
 cypress
 dist
 Dockerfile*
@@ -24,6 +23,10 @@ gen-docs
 docs
 LICENSE
 node_modules
+.env
+.env.*
+committag.json
+report.xml
 public/os_logo_filled.png
 public/preview.jpg
 stylelint.config.js

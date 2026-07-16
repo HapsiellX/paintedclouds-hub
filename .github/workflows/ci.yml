@@ -1,320 +1,117 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Seerr CI
+name: CI
 
 on:
   pull_request:
-    branches:
-      - '*'
+    branches: [main]
   push:
-    branches:
-      - develop
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-
-env:
-  DOCKER_HUB: seerr/seerr
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  i18n:
-    name: i18n Check
-    if: github.event_name == 'pull_request'
+  security:
+    name: Scan source and configuration
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      pull-requests: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_REPO: ${{ github.repository }}
-      NUMBER: ${{ github.event.pull_request.number }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan vulnerabilities, secrets, and misconfiguration
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+  validate:
+    name: Validate application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: node:22.22.2-alpine3.23@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Pnpm Setup
+      - name: Set up pnpm
         uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: 'package.json'
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         env:
-          CI: true
-        run: pnpm install
+          CI: 'true'
+          CYPRESS_INSTALL_BINARY: '0'
+        run: pnpm install --frozen-lockfile
 
-      - name: i18n Check
-        shell: bash
-        env:
-          I18N_LABEL: i18n-out-of-sync
-          BODY: |
-            The i18n check failed because translation messages are out of sync.
-
-            This usually happens when you've added or modified translation strings in your code but haven't updated the translation file.
-
-            Please run `pnpm i18n:extract` and commit the changes.
-        run: |
-          retry() { n=0; until "$@"; do n=$((n+1)); [ $n -ge 3 ] && break; echo "retry $n: $*" >&2; sleep 2; done; }
-          check_failed=0; node bin/check-i18n.js || check_failed=$?
-          pr_labels=$(gh pr view "$NUMBER" -R "$GH_REPO" --json labels -q '.labels[].name' 2>/dev/null) || true
-          has_label=0
-          while IFS= read -r name; do [ -n "$name" ] && [ "$name" = "$I18N_LABEL" ] && has_label=1 && break; done <<< "$pr_labels"
-          if [ "$check_failed" -eq 1 ]; then
-            [ "$has_label" -eq 0 ] && { retry gh pr edit "$NUMBER" -R "$GH_REPO" --add-label "$I18N_LABEL" || true; retry gh pr comment "$NUMBER" -R "$GH_REPO" -b "$BODY" || true; }
-          else
-            [ "$has_label" -eq 1 ] && retry gh pr edit "$NUMBER" -R "$GH_REPO" --remove-label "$I18N_LABEL" || true
-          fi
-          exit $check_failed
-  test:
-    name: Lint & Test Build
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    container: node:22.22.2-alpine3.23@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Pnpm Setup
-        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
-
-      - name: Get pnpm store directory
-        shell: sh
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        env:
-          CI: true
-        run: pnpm install
+      - name: Check formatting
+        run: pnpm format:check
 
       - name: Lint
         run: pnpm lint
 
-      - name: Formatting
-        run: pnpm format:check
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Build
-        run: pnpm build
-
-  unit-test:
-    name: Unit Tests
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    container: node:22.22.2-alpine3.23@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
-    permissions:
-      checks: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Pnpm Setup
-        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
-
-      - name: Get pnpm store directory
-        shell: sh
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
+      - name: Unit tests
         env:
-          CI: true
-        run: pnpm install
-
-      - name: Run tests
-        env:
-          CI: true
+          CI: 'true'
         run: pnpm test
 
-      - name: Publish test report
-        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
-        if: success() || failure() # always run even if the previous step fails
-        with:
-          report_paths: 'report.xml'
+      - name: Production build
+        run: pnpm build
 
-  build:
-    name: Build (per-arch, native runners)
-    if: github.ref == 'refs/heads/develop'
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            platform: linux/amd64
-            arch: amd64
-          - runner: ubuntu-24.04-arm
-            platform: linux/arm64
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
+  container:
+    name: Validate container build
+    needs: [security, validate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-
-      - name: Commit timestamp
-        id: ts
-        run: echo "TIMESTAMP=$(git log -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
-      - name: Warm cache (no push) — ${{ matrix.platform }}
+      - name: Read deterministic build metadata
+        id: metadata
+        shell: bash
+        run: |
+          echo "epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+          echo "date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build without publishing
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64
           push: false
           build-args: |
             COMMIT_TAG=${{ github.sha }}
-            BUILD_VERSION=develop
-            SOURCE_DATE_EPOCH=${{ steps.ts.outputs.TIMESTAMP }}
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+            BUILD_VERSION=ci-${{ github.sha }}
+            BUILD_DATE=${{ steps.metadata.outputs.date }}
+            REPOSITORY_URL=${{ github.server_url }}/${{ github.repository }}
+            SOURCE_DATE_EPOCH=${{ steps.metadata.outputs.epoch }}
+          cache-from: type=gha,scope=ci-amd64
+          cache-to: type=gha,mode=max,scope=ci-amd64
           provenance: false
-
-  publish:
-    name: Publish multi-arch image
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Commit timestamp
-        id: ts
-        run: echo "TIMESTAMP=$(git log -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
-        with:
-          images: |
-            ${{ env.DOCKER_HUB }}
-            ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=develop
-            type=sha
-          labels: |
-            org.opencontainers.image.created=${{ steps.ts.outputs.TIMESTAMP }}
-
-      - name: Build & Push (multi-arch, single tag)
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            COMMIT_TAG=${{ github.sha }}
-            BUILD_VERSION=develop
-            SOURCE_DATE_EPOCH=${{ steps.ts.outputs.TIMESTAMP }}
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: |
-            type=gha,scope=linux/amd64
-            type=gha,scope=linux/arm64
-          cache-to: type=gha,mode=max
-          provenance: false
-
-  discord:
-    name: Send Discord Notification
-    needs: publish
-    if: always() && github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Determine Workflow Status
-        id: status
-        run: |
-          case "${{ needs.publish.result }}" in
-            success)   echo "status=Success"   >> $GITHUB_OUTPUT; echo "colour=3066993"  >> $GITHUB_OUTPUT ;;
-            failure)   echo "status=Failure"   >> $GITHUB_OUTPUT; echo "colour=15158332" >> $GITHUB_OUTPUT ;;
-            cancelled) echo "status=Cancelled" >> $GITHUB_OUTPUT; echo "colour=10181046" >> $GITHUB_OUTPUT ;;
-            *)         echo "status=Skipped"   >> $GITHUB_OUTPUT; echo "colour=9807270"  >> $GITHUB_OUTPUT ;;
-          esac
-
-      - name: Send Discord notification
-        shell: bash
-        run: |
-          WEBHOOK="${{ secrets.DISCORD_WEBHOOK }}"
-
-          PAYLOAD=$(cat <<EOF
-          {
-            "embeds": [{
-              "title": "${{ steps.status.outputs.status }}: ${{ github.workflow }}",
-              "color": ${{ steps.status.outputs.colour }},
-              "fields": [
-                { "name": "Repository",   "value": "[${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})", "inline": true },
-                { "name": "Ref",          "value": "${{ github.ref }}", "inline": true },
-                { "name": "Event",        "value": "${{ github.event_name }}", "inline": true },
-                { "name": "Triggered by", "value": "${{ github.actor }}", "inline": true },
-                { "name": "Workflow",     "value": "[${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": true }
-              ],
-            }]
-          }
-          EOF
-          )
-
-          curl -sS -H "Content-Type: application/json" -X POST -d "$PAYLOAD" "$WEBHOOK" || true
+          sbom: false
