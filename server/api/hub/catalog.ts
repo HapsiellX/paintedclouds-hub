@@ -19,6 +19,13 @@ export interface HubCatalogItem {
   languages?: string[];
 }
 
+export interface HubCatalogShelf {
+  id: string;
+  title: string;
+  description: string;
+  items: HubCatalogItem[];
+}
+
 interface MusicBrainzArtistResponse {
   artists?: {
     id: string;
@@ -45,6 +52,19 @@ interface OpenLibraryResponse {
     author_name?: string[];
     first_publish_year?: number;
     cover_i?: number;
+    language?: string[];
+  }[];
+}
+
+interface OpenLibraryWorksResponse {
+  works?: {
+    key: string;
+    title: string;
+    author_name?: string[];
+    authors?: { name: string }[];
+    first_publish_year?: number;
+    cover_i?: number;
+    cover_id?: number;
     language?: string[];
   }[];
 }
@@ -173,6 +193,175 @@ const searchBooks = async (query: string): Promise<HubCatalogItem[]> => {
     languages: book.language,
   }));
 };
+
+const mapReleaseGroups = (
+  albums: NonNullable<MusicBrainzReleaseResponse['release-groups']>
+): HubCatalogItem[] =>
+  albums.map((album) => ({
+    kind: HubMediaKind.MUSIC_ALBUM,
+    provider: 'musicbrainz' as const,
+    externalId: album.id,
+    title: album.title,
+    subtitle: (album['artist-credit'] ?? [])
+      .map((credit) => credit.name)
+      .join(', '),
+    imageUrl: `https://coverartarchive.org/release-group/${album.id}/front-500`,
+    year: album['first-release-date']
+      ? Number(album['first-release-date'].slice(0, 4))
+      : undefined,
+  }));
+
+const discoverMusicShelf = async ({
+  id,
+  title,
+  description,
+  query,
+}: Omit<HubCatalogShelf, 'items'> & {
+  query: string;
+}): Promise<HubCatalogShelf> => {
+  const response = await musicBrainz.get<MusicBrainzReleaseResponse>(
+    '/release-group',
+    { params: { query, fmt: 'json', limit: 18 } }
+  );
+  return {
+    id,
+    title,
+    description,
+    items: mapReleaseGroups(response.data['release-groups'] ?? []),
+  };
+};
+
+const mapOpenLibraryWorks = (
+  works: NonNullable<OpenLibraryWorksResponse['works']>
+): HubCatalogItem[] =>
+  works.map((book) => {
+    const coverId = book.cover_i ?? book.cover_id;
+    return {
+      kind: HubMediaKind.BOOK,
+      provider: 'openlibrary' as const,
+      externalId: book.key.replace('/works/', ''),
+      title: book.title,
+      subtitle: (
+        book.author_name ??
+        book.authors?.map((author) => author.name) ??
+        []
+      ).join(', '),
+      imageUrl: coverId
+        ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`
+        : undefined,
+      year: book.first_publish_year,
+      languages: book.language,
+    };
+  });
+
+const discoverBookShelf = async ({
+  id,
+  title,
+  description,
+  path,
+}: Omit<HubCatalogShelf, 'items'> & {
+  path: string;
+}): Promise<HubCatalogShelf> => {
+  const response = await openLibrary.get<OpenLibraryWorksResponse>(path, {
+    params: { limit: 18 },
+  });
+  return {
+    id,
+    title,
+    description,
+    items: mapOpenLibraryWorks(response.data.works ?? []),
+  };
+};
+
+const settledShelves = async (
+  shelves: Promise<HubCatalogShelf>[]
+): Promise<{ shelves: HubCatalogShelf[]; errors: string[] }> => {
+  const settled = await Promise.allSettled(shelves);
+  return {
+    shelves: settled.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : []
+    ),
+    errors: settled.flatMap((result) =>
+      result.status === 'rejected' ? [String(result.reason?.message)] : []
+    ),
+  };
+};
+
+const discoverMusicShelves = () =>
+  settledShelves([
+    discoverMusicShelf({
+      id: 'metal-rock',
+      title: 'Metal & Rock',
+      description: 'Druckvolle Alben und moderne Gitarrenmusik',
+      query: 'tag:metal AND primarytype:album',
+    }),
+    discoverMusicShelf({
+      id: 'soundtracks',
+      title: 'Soundtracks & Scores',
+      description: 'Musik aus Film, Serie, Anime und Games',
+      query: 'secondarytype:soundtrack',
+    }),
+    discoverMusicShelf({
+      id: 'electronic-ambient',
+      title: 'Electronic & Ambient',
+      description: 'Elektronische Klangwelten zum Entdecken',
+      query: '(tag:electronic OR tag:ambient) AND primarytype:album',
+    }),
+  ]);
+
+const discoverBookShelves = () =>
+  settledShelves([
+    discoverBookShelf({
+      id: 'trending',
+      title: 'Gerade beliebt',
+      description: 'Aktuell häufig entdeckte Bücher',
+      path: '/trending/daily.json',
+    }),
+    discoverBookShelf({
+      id: 'science-fiction',
+      title: 'Science-Fiction',
+      description: 'Ferne Welten, Zukunft und große Ideen',
+      path: '/subjects/science_fiction.json',
+    }),
+    discoverBookShelf({
+      id: 'fantasy',
+      title: 'Fantasy',
+      description: 'Magische Welten und epische Abenteuer',
+      path: '/subjects/fantasy.json',
+    }),
+    discoverBookShelf({
+      id: 'thrillers',
+      title: 'Thriller & Mystery',
+      description: 'Spannung, Rätsel und dunkle Geheimnisse',
+      path: '/subjects/thriller.json',
+    }),
+  ]);
+
+type DiscoveryResult = Awaited<ReturnType<typeof settledShelves>>;
+const discoveryCache = new Map<
+  'music' | 'books',
+  { expiresAt: number; value: DiscoveryResult }
+>();
+
+const cachedDiscovery = async (
+  section: 'music' | 'books',
+  load: () => Promise<DiscoveryResult>
+): Promise<DiscoveryResult> => {
+  const cached = discoveryCache.get(section);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const value = await load();
+  discoveryCache.set(section, {
+    expiresAt: Date.now() + 60 * 60 * 1_000,
+    value,
+  });
+  return value;
+};
+
+export const discoverHubMusic = () =>
+  cachedDiscovery('music', discoverMusicShelves);
+
+export const discoverHubBooks = () =>
+  cachedDiscovery('books', discoverBookShelves);
 
 export const searchHubCatalog = async ({
   query,

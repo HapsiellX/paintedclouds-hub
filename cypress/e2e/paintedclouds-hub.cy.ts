@@ -39,4 +39,22 @@ describe('PaintedClouds Hub', () => {
     cy.contains('a', 'Musik').should('exist');
     cy.contains('a', 'Bücher & Hörbücher').should('exist');
   });
+
+  it('shows curated music and book discovery shelves', () => {
+    cy.visit('/discover/music');
+    cy.get('[data-testid=music-discover-shelves]').should('be.visible');
+    cy.get('[data-testid=music-discover-card]').should(
+      'have.length.at.least',
+      12
+    );
+    cy.contains('Metal & Rock').should('be.visible');
+
+    cy.visit('/discover/books');
+    cy.get('[data-testid=books-discover-shelves]').should('be.visible');
+    cy.get('[data-testid=books-discover-card]').should(
+      'have.length.at.least',
+      12
+    );
+    cy.contains('Gerade beliebt').should('be.visible');
+  });
 });

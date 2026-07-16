@@ -84,16 +84,16 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /[?&]kinds=tv(?:&|$)/,
   },
   {
-    href: '/hub?kinds=music_artist,music_album',
+    href: '/discover/music',
     messagesKey: 'browsemusic',
     svgIcon: <MusicalNoteIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /[?&]kinds=music_artist(?:,|%2C)music_album(?:&|$)/,
+    activeRegExp: /^\/discover\/music/,
   },
   {
-    href: '/hub?kinds=book',
+    href: '/discover/books',
     messagesKey: 'browsebooks',
     svgIcon: <BookOpenIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /[?&]kinds=book(?:&|$)/,
+    activeRegExp: /^\/discover\/books/,
   },
   {
     href: '/requests',

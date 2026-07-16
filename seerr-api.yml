@@ -8266,6 +8266,19 @@ paths:
       tags: [hub]
       responses:
         '200': { description: Hub overview }
+  /hub/discover/{section}:
+    get:
+      summary: Get curated PaintedClouds music or book shelves
+      tags: [hub]
+      parameters:
+        - in: path
+          name: section
+          required: true
+          schema:
+            type: string
+            enum: [music, books]
+      responses:
+        '200': { description: Curated catalog shelves }
   /hub/requests:
     get:
       summary: List Hub requests visible to the current user

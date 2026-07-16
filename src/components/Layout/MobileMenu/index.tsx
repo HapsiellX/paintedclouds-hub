@@ -106,18 +106,18 @@ const MobileMenu = ({
       activeRegExp: /[?&]kinds=tv(?:&|$)/,
     },
     {
-      href: '/hub?kinds=music_artist,music_album',
+      href: '/discover/music',
       content: intl.formatMessage(menuMessages.browsemusic),
       svgIcon: <MusicalNoteIcon className="h-6 w-6" />,
       svgIconSelected: <FilledMusicalNoteIcon className="h-6 w-6" />,
-      activeRegExp: /[?&]kinds=music_artist(?:,|%2C)music_album(?:&|$)/,
+      activeRegExp: /^\/discover\/music/,
     },
     {
-      href: '/hub?kinds=book',
+      href: '/discover/books',
       content: intl.formatMessage(menuMessages.browsebooks),
       svgIcon: <BookOpenIcon className="h-6 w-6" />,
       svgIconSelected: <FilledBookOpenIcon className="h-6 w-6" />,
-      activeRegExp: /[?&]kinds=book(?:&|$)/,
+      activeRegExp: /^\/discover\/books/,
     },
     {
       href: '/requests',

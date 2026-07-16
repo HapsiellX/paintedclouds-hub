@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
       { hostname: 'image.tmdb.org' },
       { hostname: 'artworks.thetvdb.com' },
       { hostname: 'plex.tv' },
+      { hostname: 'coverartarchive.org' },
+      { hostname: 'covers.openlibrary.org' },
     ],
   },
   transpilePackages: ['country-flag-icons'],

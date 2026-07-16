@@ -1,4 +1,8 @@
-import { searchHubCatalog } from '@server/api/hub/catalog';
+import {
+  discoverHubBooks,
+  discoverHubMusic,
+  searchHubCatalog,
+} from '@server/api/hub/catalog';
 import {
   HubMediaKind,
   HubRequestFormat,
@@ -122,6 +126,18 @@ hubRoutes.get('/search', async (req, res) => {
       language: String(req.query.language ?? req.locale ?? 'de-DE'),
     });
     return res.json(results);
+  } catch (e) {
+    return res.status(502).json({ message: e.message });
+  }
+});
+
+hubRoutes.get('/discover/:section', async (req, res) => {
+  try {
+    if (req.params.section === 'music')
+      return res.json(await discoverHubMusic());
+    if (req.params.section === 'books')
+      return res.json(await discoverHubBooks());
+    return res.status(404).json({ message: 'Unbekannter Medienbereich.' });
   } catch (e) {
     return res.status(502).json({ message: e.message });
   }
