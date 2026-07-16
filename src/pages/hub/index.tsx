@@ -9,7 +9,7 @@ import {
 import axios from 'axios';
 import type { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 
 type HubKind = 'movie' | 'tv' | 'music_artist' | 'music_album' | 'book';
@@ -68,19 +68,22 @@ const stateLabels: Record<string, string> = {
   cancelled: 'Abgebrochen',
 };
 
+const allKinds = Object.keys(kindLabels) as HubKind[];
+
+const parseKinds = (value: string | string[] | undefined): HubKind[] => {
+  const requested = (Array.isArray(value) ? value.join(',') : (value ?? ''))
+    .split(',')
+    .filter((kind): kind is HubKind => allKinds.includes(kind as HubKind));
+  return requested.length ? requested : allKinds;
+};
+
 const HubPage: NextPage = () => {
   const router = useRouter();
   const { hasPermission } = useUser();
   const admin = hasPermission(Permission.ADMIN);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
-  const [kinds, setKinds] = useState<HubKind[]>([
-    'movie',
-    'tv',
-    'music_artist',
-    'music_album',
-    'book',
-  ]);
+  const [kinds, setKinds] = useState<HubKind[]>(allKinds);
   const [message, setMessage] = useState<string>();
   const searchUrl = useMemo(
     () =>
@@ -89,7 +92,11 @@ const HubPage: NextPage = () => {
         : null,
     [submittedQuery, kinds]
   );
-  const { data: search, isLoading: searching } = useSWR<{
+  const {
+    data: search,
+    error: searchError,
+    isLoading: searching,
+  } = useSWR<{
     results: CatalogItem[];
     errors: string[];
   }>(searchUrl);
@@ -97,6 +104,17 @@ const HubPage: NextPage = () => {
     '/api/v1/hub/overview',
     { refreshInterval: 30_000 }
   );
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const routeQuery = Array.isArray(router.query.query)
+      ? router.query.query[0]
+      : (router.query.query ?? '');
+    const routeKinds = parseKinds(router.query.kinds);
+    setQuery(routeQuery);
+    setSubmittedQuery(routeQuery.trim().length >= 2 ? routeQuery.trim() : '');
+    setKinds(routeKinds);
+  }, [router.isReady, router.query.kinds, router.query.query]);
 
   const toggleKind = (kind: HubKind) =>
     setKinds((current) =>
@@ -160,11 +178,22 @@ const HubPage: NextPage = () => {
           className="mt-6 flex flex-col gap-3 sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
-            if (query.trim().length >= 2 && kinds.length)
-              setSubmittedQuery(query.trim());
+            const normalizedQuery = query.trim();
+            if (normalizedQuery.length >= 2 && kinds.length) {
+              setSubmittedQuery(normalizedQuery);
+              void router.replace(
+                {
+                  pathname: '/hub',
+                  query: { query: normalizedQuery, kinds: kinds.join(',') },
+                },
+                undefined,
+                { shallow: true }
+              );
+            }
           }}
         >
           <input
+            data-testid="hub-search-input"
             className="min-w-0 flex-1 rounded-lg border border-gray-600 bg-gray-950/80 px-4 py-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -172,6 +201,7 @@ const HubPage: NextPage = () => {
             aria-label="Medien durchsuchen"
           />
           <button
+            data-testid="hub-search-submit"
             className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
             type="submit"
             disabled={query.trim().length < 2 || !kinds.length}
@@ -203,17 +233,28 @@ const HubPage: NextPage = () => {
         </div>
       )}
 
-      {(searching || search) && (
-        <section>
+      {(searching || search || searchError) && (
+        <section data-testid="hub-search-results">
           <h2 className="mb-4 text-2xl font-semibold text-white">
             Suchergebnisse
           </h2>
           {searching ? (
             <p className="text-gray-400">Kataloge werden durchsucht …</p>
+          ) : searchError ? (
+            <div className="rounded-lg border border-red-500/30 bg-red-950/40 p-4 text-red-200">
+              Die Suche konnte nicht ausgeführt werden. Bitte versuche es noch
+              einmal.
+            </div>
+          ) : search?.results.length === 0 ? (
+            <div className="rounded-lg border border-gray-700 bg-gray-800/60 p-4 text-gray-300">
+              Keine passenden Ergebnisse gefunden. Prüfe die ausgewählten
+              Medientypen oder versuche einen anderen Suchbegriff.
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {search?.results.map((item) => (
                 <article
+                  data-testid={`hub-result-${item.kind}`}
                   key={`${item.provider}-${item.kind}-${item.externalId}`}
                   className="overflow-hidden rounded-xl border border-gray-700 bg-gray-800/70"
                 >

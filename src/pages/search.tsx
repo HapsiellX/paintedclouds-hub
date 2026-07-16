@@ -1,7 +1,3 @@
-import Search from '@app/components/Search';
-
-const SearchPage = () => {
-  return <Search />;
-};
-
-export default SearchPage;
+// Keep the established /search route for the global search field and old
+// bookmarks, but render the unified PaintedClouds catalog instead of TMDB only.
+export { default } from './hub';
