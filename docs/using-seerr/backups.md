@@ -9,7 +9,7 @@ sidebar_position: 4
 ## Settings  
 
 All configurations from the **Settings** panel in the Seerr web UI are saved, including integrations with Radarr, Sonarr, Lidarr, Jellyfin, Plex, and notification settings.
-These settings are stored in the `settings.json` file located in the Seerr data folder.
+These settings are stored in the `settings.json` file located in the Seerr data folder. PaintedClouds Hub encrypts its integration secrets with `hub-secrets.key`. Back up and restore both files as one matching set; neither file is sufficient on its own.
 
 ## User Data  
 
@@ -60,7 +60,8 @@ After restoring your `db/db.sqlite3` file and, optionally, the `settings.json` f
 ├── db
 │   └── db.sqlite3
 ├── logs             <-- Optional
-└── settings.json    <-- Optional (required if you want to avoid reconfiguring Seerr)
+├── settings.json    <-- Optional (required if you want to avoid reconfiguring Seerr)
+└── hub-secrets.key  <-- Required for encrypted PaintedClouds Hub secrets
 ```
 
 Once the files are restored, start the Seerr application.
@@ -87,7 +88,8 @@ Optionally, restore the `settings.json` file. The `config` folder structure shou
 .
 ├── cache            <-- Optional
 ├── logs             <-- Optional
-└── settings.json    <-- Optional (required if you want to avoid reconfiguring Seerr)
+├── settings.json    <-- Optional (required if you want to avoid reconfiguring Seerr)
+└── hub-secrets.key  <-- Required for encrypted PaintedClouds Hub secrets
 ```
 
 Once the database and files are restored, start the Seerr application.

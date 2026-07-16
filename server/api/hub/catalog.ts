@@ -4,6 +4,7 @@ import type {
   TmdbTvResult,
 } from '@server/api/themoviedb/interfaces';
 import { HubMediaKind } from '@server/constants/hub';
+import { getSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import rateLimit from 'axios-rate-limit';
@@ -25,6 +26,20 @@ export interface HubCatalogShelf {
   title: string;
   description: string;
   items: HubCatalogItem[];
+}
+
+export interface HubCatalogEdition {
+  id: string;
+  title: string;
+  languages: string[];
+  isbn: string[];
+  publishDate?: string;
+  publishers: string[];
+}
+
+export interface HubCatalogDetail extends HubCatalogItem {
+  related: HubCatalogItem[];
+  editions: HubCatalogEdition[];
 }
 
 interface MusicBrainzArtistResponse {
@@ -102,19 +117,23 @@ interface HubCatalogClients {
 
 export class HubCatalogItemNotFoundError extends Error {}
 
-const metadataContactEmail = process.env.HUB_METADATA_CONTACT_EMAIL?.trim();
-const metadataUserAgent =
-  process.env.HUB_METADATA_USER_AGENT?.trim() ||
-  `PaintedCloudsHub/0.1${
-    metadataContactEmail ? ` (mailto:${metadataContactEmail})` : ''
-  }`;
+const metadataIdentity = () => {
+  const metadata = getSettings().hub.metadata;
+  const contactEmail = metadata.contactEmail.trim();
+  return {
+    contactEmail,
+    userAgent:
+      metadata.userAgent.trim() ||
+      `PaintedCloudsHub/0.2${contactEmail ? ` (mailto:${contactEmail})` : ''}`,
+  };
+};
 
 const musicBrainz = rateLimit(
   axios.create({
     baseURL: 'https://musicbrainz.org/ws/2',
     timeout: 10_000,
     headers: {
-      'User-Agent': metadataUserAgent,
+      'User-Agent': 'PaintedCloudsHub/0.2',
     },
   }),
   { maxRequests: 1, perMilliseconds: 1_000 }
@@ -124,13 +143,26 @@ const openLibrary = rateLimit(
   axios.create({
     baseURL: 'https://openlibrary.org',
     timeout: 10_000,
-    params: metadataContactEmail ? { email: metadataContactEmail } : undefined,
     headers: {
-      'User-Agent': metadataUserAgent,
+      'User-Agent': 'PaintedCloudsHub/0.2',
     },
   }),
-  { maxRequests: metadataContactEmail ? 3 : 1, perMilliseconds: 1_000 }
+  { maxRequests: 3, perMilliseconds: 1_000 }
 );
+
+musicBrainz.interceptors.request.use((config) => {
+  config.headers.set('User-Agent', metadataIdentity().userAgent);
+  return config;
+});
+openLibrary.interceptors.request.use((config) => {
+  const identity = metadataIdentity();
+  config.headers.set('User-Agent', identity.userAgent);
+  config.params = {
+    ...(typeof config.params === 'object' ? config.params : {}),
+    ...(identity.contactEmail ? { email: identity.contactEmail } : {}),
+  };
+  return config;
+});
 
 const searchVideo = async (
   query: string,
@@ -324,64 +356,95 @@ const settledShelves = async (
   };
 };
 
-const discoverMusicShelves = () =>
+const translate = (locale: string, de: string, en: string) =>
+  locale.toLowerCase().startsWith('de') ? de : en;
+
+const discoverMusicShelves = (locale: string) =>
   settledShelves([
     discoverMusicShelf({
       id: 'metal-rock',
       title: 'Metal & Rock',
-      description: 'Druckvolle Alben und moderne Gitarrenmusik',
+      description: translate(
+        locale,
+        'Druckvolle Alben und moderne Gitarrenmusik',
+        'Heavy albums and modern guitar music'
+      ),
       query: 'tag:metal AND primarytype:album',
     }),
     discoverMusicShelf({
       id: 'soundtracks',
       title: 'Soundtracks & Scores',
-      description: 'Musik aus Film, Serie, Anime und Games',
+      description: translate(
+        locale,
+        'Musik aus Film, Serie, Anime und Games',
+        'Music from movies, series, anime, and games'
+      ),
       query: 'secondarytype:soundtrack',
     }),
     discoverMusicShelf({
       id: 'electronic-ambient',
       title: 'Electronic & Ambient',
-      description: 'Elektronische Klangwelten zum Entdecken',
+      description: translate(
+        locale,
+        'Elektronische Klangwelten zum Entdecken',
+        'Electronic soundscapes to discover'
+      ),
       query: '(tag:electronic OR tag:ambient) AND primarytype:album',
     }),
   ]);
 
-const discoverBookShelves = () =>
+const discoverBookShelves = (locale: string) =>
   settledShelves([
     discoverBookShelf({
       id: 'trending',
-      title: 'Gerade beliebt',
-      description: 'Aktuell häufig entdeckte Bücher',
+      title: translate(locale, 'Gerade beliebt', 'Trending now'),
+      description: translate(
+        locale,
+        'Aktuell häufig entdeckte Bücher',
+        'Books readers are discovering now'
+      ),
       path: '/trending/daily.json',
     }),
     discoverBookShelf({
       id: 'science-fiction',
       title: 'Science-Fiction',
-      description: 'Ferne Welten, Zukunft und große Ideen',
+      description: translate(
+        locale,
+        'Ferne Welten, Zukunft und große Ideen',
+        'Distant worlds, futures, and big ideas'
+      ),
       path: '/subjects/science_fiction.json',
     }),
     discoverBookShelf({
       id: 'fantasy',
       title: 'Fantasy',
-      description: 'Magische Welten und epische Abenteuer',
+      description: translate(
+        locale,
+        'Magische Welten und epische Abenteuer',
+        'Magical worlds and epic adventures'
+      ),
       path: '/subjects/fantasy.json',
     }),
     discoverBookShelf({
       id: 'thrillers',
       title: 'Thriller & Mystery',
-      description: 'Spannung, Rätsel und dunkle Geheimnisse',
+      description: translate(
+        locale,
+        'Spannung, Rätsel und dunkle Geheimnisse',
+        'Suspense, mysteries, and dark secrets'
+      ),
       path: '/subjects/thriller.json',
     }),
   ]);
 
 type DiscoveryResult = Awaited<ReturnType<typeof settledShelves>>;
 const discoveryCache = new Map<
-  'music' | 'books',
+  string,
   { expiresAt: number; value: DiscoveryResult }
 >();
 
 const cachedDiscovery = async (
-  section: 'music' | 'books',
+  section: string,
   load: () => Promise<DiscoveryResult>
 ): Promise<DiscoveryResult> => {
   const cached = discoveryCache.get(section);
@@ -394,11 +457,11 @@ const cachedDiscovery = async (
   return value;
 };
 
-export const discoverHubMusic = () =>
-  cachedDiscovery('music', discoverMusicShelves);
+export const discoverHubMusic = (locale = 'de') =>
+  cachedDiscovery(`music:${locale}`, () => discoverMusicShelves(locale));
 
-export const discoverHubBooks = () =>
-  cachedDiscovery('books', discoverBookShelves);
+export const discoverHubBooks = (locale = 'de') =>
+  cachedDiscovery(`books:${locale}`, () => discoverBookShelves(locale));
 
 export const searchHubCatalog = async ({
   query,
@@ -594,4 +657,58 @@ export const resolveHubCatalogItem = async (
     }
     throw error;
   }
+};
+
+export const resolveHubCatalogDetail = async (
+  input: Parameters<typeof resolveHubCatalogItem>[0]
+): Promise<HubCatalogDetail> => {
+  const item = await resolveHubCatalogItem(input);
+  if (input.kind === HubMediaKind.MUSIC_ARTIST) {
+    const response = await musicBrainz.get<MusicBrainzReleaseResponse>(
+      '/release-group',
+      { params: { artist: item.externalId, fmt: 'json', limit: 50 } }
+    );
+    return {
+      ...item,
+      related: mapReleaseGroups(response.data['release-groups'] ?? []),
+      editions: [],
+    };
+  }
+  if (input.kind === HubMediaKind.MUSIC_ALBUM) {
+    return { ...item, related: [], editions: [] };
+  }
+  const response = await openLibrary.get<{
+    entries?: {
+      key?: string;
+      title?: string;
+      languages?: { key?: string }[];
+      isbn_10?: string[];
+      isbn_13?: string[];
+      publish_date?: string;
+      publishers?: string[];
+    }[];
+  }>(`/works/${encodeURIComponent(item.externalId)}/editions.json`, {
+    params: { limit: 50 },
+  });
+  const editions = (response.data.entries ?? []).flatMap((edition) => {
+    const id = edition.key?.replace('/books/', '');
+    if (!id || !/^OL\d+M$/i.test(id)) return [];
+    return [
+      {
+        id: id.toUpperCase(),
+        title: canonicalText(edition.title, 500) ?? item.title,
+        languages: (edition.languages ?? []).flatMap((language) => {
+          const code = language.key?.split('/').pop();
+          return code ? [code] : [];
+        }),
+        isbn: [...(edition.isbn_13 ?? []), ...(edition.isbn_10 ?? [])].slice(
+          0,
+          10
+        ),
+        publishDate: canonicalText(edition.publish_date, 100),
+        publishers: (edition.publishers ?? []).slice(0, 10),
+      },
+    ];
+  });
+  return { ...item, related: [], editions };
 };

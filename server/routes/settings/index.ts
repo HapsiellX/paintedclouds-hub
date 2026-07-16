@@ -39,6 +39,7 @@ import { rescheduleJob } from 'node-schedule';
 import path from 'path';
 import semver from 'semver';
 import { URL } from 'url';
+import hubSettingsRoutes from './hub';
 import lidarrRoutes from './lidarr';
 import metadataRoutes from './metadata';
 import notificationRoutes from './notifications';
@@ -51,6 +52,7 @@ settingsRoutes.use('/notifications', notificationRoutes);
 settingsRoutes.use('/radarr', radarrRoutes);
 settingsRoutes.use('/sonarr', sonarrRoutes);
 settingsRoutes.use('/lidarr', lidarrRoutes);
+settingsRoutes.use('/hub', hubSettingsRoutes);
 settingsRoutes.use('/discover', discoverSettingRoutes);
 settingsRoutes.use('/metadatas', metadataRoutes);
 

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Existing signed prerelease tag, for example v0.1.0-alpha.1
+        description: Existing signed tag, for example v0.2.0-rc.1 or v0.2.0
         required: true
         type: string
       candidate_sha:
@@ -30,7 +30,7 @@ env:
 
 jobs:
   promote:
-    name: Verify and publish prerelease
+    name: Verify and publish release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: release
@@ -54,8 +54,8 @@ jobs:
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
         run: |
-          if [[ ! "$VERSION" =~ ^v0\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
-            echo 'Only v0.x.y-alpha.n and v0.x.y-beta.n prereleases are allowed' >&2
+          if [[ ! "$VERSION" =~ ^v0\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
+            echo 'Only v0.x.y and v0.x.y-alpha.n, beta.n, or rc.n versions are allowed' >&2
             exit 1
           fi
           if [[ ! "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -90,6 +90,19 @@ jobs:
           fi
           echo "image_version=${VERSION#v}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${CANDIDATE_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-alpha.* ]]; then
+            echo 'channel=alpha' >> "$GITHUB_OUTPUT"
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          elif [[ "$VERSION" == *-beta.* ]]; then
+            echo 'channel=beta' >> "$GITHUB_OUTPUT"
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          elif [[ "$VERSION" == *-rc.* ]]; then
+            echo 'channel=rc' >> "$GITHUB_OUTPUT"
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'channel=stable' >> "$GITHUB_OUTPUT"
+            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
@@ -145,26 +158,28 @@ jobs:
           trivy image --format cyclonedx --output paintedclouds-hub.cdx.json \
             "$IMAGE@$CANDIDATE_DIGEST"
 
-      - name: Promote exact digest to version and alpha channel
+      - name: Promote exact digest to version and release channel
         env:
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
           IMAGE_VERSION: ${{ steps.release.outputs.image_version }}
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
           docker buildx imagetools create \
             --tag "$IMAGE:$IMAGE_VERSION" \
-            --tag "$IMAGE:alpha" \
+            --tag "$IMAGE:$RELEASE_CHANNEL" \
             "$IMAGE@$CANDIDATE_DIGEST"
           promoted=$(docker buildx imagetools inspect "$IMAGE:$IMAGE_VERSION" \
             --format '{{json .Manifest.Digest}}' | tr -d '"')
           test "$promoted" = "$CANDIDATE_DIGEST"
 
-      - name: Publish GitHub prerelease
+      - name: Publish GitHub release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
           IMAGE_VERSION: ${{ steps.release.outputs.image_version }}
+          IS_PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Container: \`$IMAGE:$IMAGE_VERSION\`
@@ -179,10 +194,16 @@ jobs:
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
           \`\`\`
 
-          This is a prerelease. Back up the configuration directory and database before upgrading.
+          Back up the configuration directory and database before upgrading.
           EOF
+          release_flags=()
+          if [[ "$IS_PRERELEASE" == true ]]; then
+            release_flags+=(--prerelease)
+          else
+            release_flags+=(--latest)
+          fi
           gh release create "$VERSION" paintedclouds-hub.cdx.json \
             --verify-tag \
-            --prerelease \
+            "${release_flags[@]}" \
             --title "PaintedClouds Hub $VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

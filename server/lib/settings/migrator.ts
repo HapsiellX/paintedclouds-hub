@@ -20,11 +20,13 @@ export const runMigrations = async (
     } catch {
       /* empty */
     }
-    await fs.writeFile(BACKUP_PATH, JSON.stringify(settings, undefined, ' '));
+    await fs.writeFile(BACKUP_PATH, JSON.stringify(settings, undefined, ' '), {
+      mode: 0o600,
+    });
 
-    const migrations = (await fs.readdir(migrationsDir)).filter(
-      (file) => file.endsWith('.js') || file.endsWith('.ts')
-    );
+    const migrations = (await fs.readdir(migrationsDir))
+      .filter((file) => file.endsWith('.js') || file.endsWith('.ts'))
+      .sort();
 
     const settingsBefore = JSON.stringify(migrated);
 
@@ -68,8 +70,10 @@ export const runMigrations = async (
       // we check that the new config will be saved
       await fs.writeFile(
         SETTINGS_PATH,
-        JSON.stringify(migrated, undefined, ' ')
+        JSON.stringify(migrated, undefined, ' '),
+        { mode: 0o600 }
       );
+      await fs.chmod(SETTINGS_PATH, 0o600);
       const fileSaved = JSON.parse(await fs.readFile(SETTINGS_PATH, 'utf-8'));
       if (JSON.stringify(fileSaved) !== settingsAfter) {
         // something went wrong while saving file
@@ -78,7 +82,7 @@ export const runMigrations = async (
     } else if (oldBackup) {
       // no migration occured
       // we save the old backup (to avoid settings.json and settings.old.json being the same)
-      await fs.writeFile(BACKUP_PATH, oldBackup.toString());
+      await fs.writeFile(BACKUP_PATH, oldBackup.toString(), { mode: 0o600 });
     }
   } catch (e) {
     // we stop Seerr if the migration failed

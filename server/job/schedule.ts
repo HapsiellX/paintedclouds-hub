@@ -2,6 +2,10 @@ import { MediaServerType } from '@server/constants/server';
 import blocklistedTagsProcessor from '@server/job/blocklistedTagsProcessor';
 import availabilitySync from '@server/lib/availabilitySync';
 import downloadTracker from '@server/lib/downloadtracker';
+import {
+  getHubReconciliationStatus,
+  reconcileHubRequests,
+} from '@server/lib/hub/reconciliation';
 import ImageProxy from '@server/lib/imageproxy';
 import refreshToken from '@server/lib/refreshToken';
 import {
@@ -257,6 +261,21 @@ export const startJobs = (): void => {
     }),
     running: () => blocklistedTagsProcessor.status().running,
     cancelFn: () => blocklistedTagsProcessor.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'hub-reconciliation',
+    name: 'PaintedClouds Hub Reconciliation',
+    type: 'process',
+    interval: 'minutes',
+    cronSchedule: jobs['hub-reconciliation'].schedule,
+    job: schedule.scheduleJob(jobs['hub-reconciliation'].schedule, () => {
+      logger.info('Starting scheduled job: Hub Reconciliation', {
+        label: 'Jobs',
+      });
+      void reconcileHubRequests();
+    }),
+    running: () => getHubReconciliationStatus().running,
   });
 
   logger.info('Scheduled jobs loaded', { label: 'Jobs' });

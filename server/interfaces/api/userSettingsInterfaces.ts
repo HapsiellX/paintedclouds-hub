@@ -11,6 +11,10 @@ export interface UserSettingsGeneralResponse {
   movieQuotaDays?: number;
   tvQuotaLimit?: number;
   tvQuotaDays?: number;
+  hubQuotaLimit?: number;
+  hubQuotaDays?: number;
+  globalHubQuotaLimit?: number;
+  globalHubQuotaDays?: number;
   globalMovieQuotaDays?: number;
   globalMovieQuotaLimit?: number;
   globalTvQuotaLimit?: number;

@@ -233,6 +233,49 @@ describe('Hub authorization and privacy', () => {
       assert.strictEqual(response.status, 403);
     }
   });
+
+  it('keeps unified activity, history, and reconciliation private', async () => {
+    const own = await seedHubRequest('friend@seerr.dev', 'OL810W');
+    const other = await seedHubRequest('admin@seerr.dev', 'OL820W');
+    await getRepository(HubAuditEvent).save({
+      request: own,
+      action: 'state_changed',
+      details: { from: 'pending', to: 'submitted', private: 'do-not-return' },
+    });
+    const agent = await loginAs('friend@seerr.dev');
+
+    const activity = await agent.get('/hub/activity?kinds=book&take=20');
+    assert.strictEqual(activity.status, 200);
+    assert.deepStrictEqual(
+      activity.body.results.map((item: { id: string }) => item.id),
+      [`hub:${own.id}`]
+    );
+    assertNoSensitiveFields(activity.body);
+
+    const history = await agent.get(`/hub/requests/${own.id}/history`);
+    assert.strictEqual(history.status, 200);
+    assert.deepStrictEqual(history.body.results[0].from, 'pending');
+    assert.ok(!JSON.stringify(history.body).includes('do-not-return'));
+    assert.strictEqual(
+      (await agent.get(`/hub/requests/${other.id}/history`)).status,
+      404
+    );
+    assert.strictEqual((await agent.get('/hub/reconciliation')).status, 403);
+    assert.strictEqual((await agent.post('/hub/reconciliation')).status, 403);
+  });
+
+  it('returns only non-sensitive request defaults and quota state', async () => {
+    const agent = await loginAs('friend@seerr.dev');
+    const preferences = await agent.get('/hub/preferences');
+    const quota = await agent.get('/hub/quota');
+    assert.strictEqual(preferences.status, 200);
+    assert.deepStrictEqual(Object.keys(preferences.body).sort(), [
+      'bookFormats',
+      'languages',
+    ]);
+    assert.strictEqual(quota.status, 200);
+    assertNoSensitiveFields(quota.body);
+  });
 });
 
 describe('Hub inbound rate limits', () => {

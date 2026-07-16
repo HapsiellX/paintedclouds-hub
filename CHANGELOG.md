@@ -12,6 +12,16 @@ container digest, and rollback requirements.
 
 ## Unreleased
 
+### V0.2
+
+- Added encrypted Admin-UI configuration with one-time V0.1 environment import.
+- Added a transactional rolling points ledger with per-user overrides for
+  SQLite and PostgreSQL.
+- Added canonical artist, album, work and edition detail APIs and pages.
+- Added a durable metadata cache, unified video/music/book activity and
+  scheduled Lidarr/LazyLibrarian reconciliation.
+- Documented the additive Hub v1 API and direct V0.1 upgrade path.
+
 ### Added
 
 - Unified Hub discovery and request workflows for artists, albums, e-books, and

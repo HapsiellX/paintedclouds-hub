@@ -5,10 +5,10 @@ manager for self-hosted libraries. It extends the movie and television
 workflows inherited from [Seerr](https://github.com/seerr-team/seerr) with
 music, e-book, and audiobook discovery and request workflows.
 
-> [!CAUTION]
-> PaintedClouds Hub is alpha software. Back up your configuration and database
-> before installing or upgrading. Interfaces, configuration, and database
-> migrations may change before the first stable release.
+> [!IMPORTANT]
+> Back up the configuration directory and database before every upgrade. Use
+> only a signed release image and a migration path explicitly listed in its
+> release notes.
 
 PaintedClouds Hub is an independent fork. It is not affiliated with, endorsed
 by, or supported by the Seerr project or its maintainers. Please report
@@ -27,18 +27,18 @@ PaintedClouds Hub problems here, not to Seerr's support channels.
 - Supports Jellyfin, Plex, and Emby authentication inherited from Seerr.
 - Supports SQLite and PostgreSQL.
 
-## Alpha Limitations
+## V0.2 Supported Scope
 
-- Book matching is title-based and may select the wrong work, edition,
-  language, or audiobook variant. Confirm the result in LazyLibrarian.
-- Requests from non-administrators always require manual approval in the first
-  alpha release. Automatic quota-based approval is intentionally disabled until
-  reservations are transactional on both SQLite and PostgreSQL.
-- Music and book acquisition state is not yet fully synchronized back from all
-  downstream services.
-- Some Hub policy values, default languages, storage assumptions, and discovery
-  shelves are not yet configurable.
-- Hub-specific user interface text is currently primarily German.
+- Music and book requests use canonical MusicBrainz and Open Library identities.
+  Books with multiple editions require an explicit edition selection.
+- Lidarr and LazyLibrarian states are reconciled into a normalized request
+  lifecycle. Temporary downstream failures preserve the last known good state.
+- Non-administrator auto-approval is opt-in and protected by a transactional,
+  rolling points ledger on SQLite and PostgreSQL.
+- Core Hub administration, activity, discovery, detail and request workflows
+  are supported in English and German.
+- Personalization, AI recommendations, Readarr and additional acquisition
+  backends are not part of V0.2.
 - External metadata and cover services may return incomplete results, throttle
   requests, or be unavailable.
 - Migration and rollback compatibility is guaranteed only where a release note
@@ -48,7 +48,7 @@ See [ROADMAP.md](./ROADMAP.md) for planned work. Roadmap items are not promises.
 
 ## Installation
 
-Published alpha releases should be installed only from the exact container
+Published releases should be installed only from the exact container
 image and digest listed in that release's notes. Do not assume an unversioned
 `latest` image is safe to deploy.
 
@@ -59,8 +59,7 @@ Before installation:
    supported.
 3. Prepare Jellyfin, Plex, or Emby and the acquisition services you intend to
    use.
-4. Keep API keys in container secrets or files mounted read-only; prefer the
-   supported `*_FILE` variables.
+4. Configure integration credentials in the authenticated Hub Admin UI.
 5. Place the application behind HTTPS when it is reachable outside a trusted
    network.
 
@@ -72,29 +71,16 @@ For source development, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Hub Configuration
 
-The base Seerr configuration remains available through the application setup
-and settings screens. Hub integrations currently use environment variables.
+Configure Hub integrations under **Settings → PaintedClouds Hub**. API keys and
+the optional Home Assistant webhook are encrypted with AES-256-GCM and are
+never returned by the API. Back up both `settings.json` and
+`hub-secrets.key`; without the latter the encrypted values cannot be recovered.
 
-| Variable | Purpose | Required |
-| --- | --- | --- |
-| `HUB_LIDARR_URL` | Base URL of Lidarr | For music requests |
-| `HUB_LIDARR_API_KEY` or `HUB_LIDARR_API_KEY_FILE` | Lidarr API key | For music requests |
-| `HUB_LIDARR_ROOT` | Lidarr music root; defaults to `/music` | No |
-| `HUB_LIDARR_QUALITY_PROFILE_ID` | Positive Lidarr quality profile ID | For music requests |
-| `HUB_LIDARR_METADATA_PROFILE_ID` | Positive Lidarr metadata profile ID | For music requests |
-| `HUB_LAZYLIBRARIAN_URL` | Base URL of LazyLibrarian | For book requests |
-| `HUB_LAZYLIBRARIAN_API_KEY` or `HUB_LAZYLIBRARIAN_API_KEY_FILE` | LazyLibrarian API key | For book requests |
-| `HUB_SONARR_URL`, `HUB_RADARR_URL`, `HUB_PROWLARR_URL`, `HUB_SABNZBD_URL` | Optional service-health endpoints | No |
-| Corresponding `HUB_*_API_KEY` or `HUB_*_API_KEY_FILE` | API keys for optional health checks | No |
-| `HUB_HOME_ASSISTANT_WEBHOOK_URL` or `HUB_HOME_ASSISTANT_WEBHOOK_URL_FILE` | Optional Home Assistant webhook | No |
-| `HUB_METADATA_CONTACT_EMAIL` | Contact identifier sent to MusicBrainz in the User-Agent and to Open Library as its `email` request parameter | Required for an identified metadata client |
-| `HUB_METADATA_USER_AGENT` | Explicitly overrides the metadata-client User-Agent; it must still identify the application and provide a valid contact | No |
-
-Use a monitored, role-based project or instance contact address for
-`HUB_METADATA_CONTACT_EMAIL`, not a maintainer's private address. Setting it
-causes that value to be disclosed to MusicBrainz and Open Library on metadata
-requests. `HUB_METADATA_USER_AGENT` is an advanced override and must continue to
-comply with each provider's current client-identification rules.
+On the first V0.2 start, existing V0.1 `HUB_*` environment variables or secret
+files are imported once. The Admin UI is authoritative afterwards, so remove
+the legacy variables after validating the import. Use a monitored role-based
+contact address for metadata providers; that address is disclosed to
+MusicBrainz and Open Library as part of responsible client identification.
 
 Do not publish logs, Compose files, screenshots, or issue reports containing API
 keys, webhook URLs, database credentials, session cookies, or private hostnames.
@@ -104,9 +90,12 @@ keys, webhook URLs, database credentials, session cookies, or private hostnames.
 1. Stop the application and take a consistent database and configuration
    backup.
 2. Read all release notes between the installed and target versions.
-3. Pull the exact version or digest, then start one application instance and
+3. For V0.1 upgrades, preserve legacy `HUB_*` values for the first V0.2 start
+   so they can be imported exactly once.
+4. Pull the exact version or digest, then start one application instance and
    allow migrations to finish.
-4. Verify login, discovery, request creation, and downstream service access
+5. Verify login, discovery, request creation, quota status, reconciliation and
+   downstream service access
    before removing the backup.
 
 Database downgrades are not supported. Rollback means restoring both the old

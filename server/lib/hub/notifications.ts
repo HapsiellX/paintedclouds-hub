@@ -1,13 +1,13 @@
+import { decryptHubSecret } from '@server/lib/hub/secrets';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import axios from 'axios';
-import fs from 'fs';
 
 const webhookUrl = (): string | undefined => {
-  if (process.env.HUB_HOME_ASSISTANT_WEBHOOK_URL) {
-    return process.env.HUB_HOME_ASSISTANT_WEBHOOK_URL;
-  }
-  const file = process.env.HUB_HOME_ASSISTANT_WEBHOOK_URL_FILE;
-  return file ? fs.readFileSync(file, 'utf8').trim() : undefined;
+  return decryptHubSecret(
+    getSettings().hub.homeAssistant.webhookUrl,
+    'home-assistant-webhook'
+  );
 };
 
 export const notifyHomeAssistant = async (

@@ -95,6 +95,43 @@ export interface LidarrSettings extends DVRSettings {
   activeMetadataProfileName: string;
 }
 
+export interface HubSecretValue {
+  encrypted: string;
+  iv: string;
+  tag: string;
+  version: 1;
+}
+
+export interface HubServiceSettings {
+  url: string;
+  apiKey?: HubSecretValue;
+}
+
+export interface HubSettings {
+  enabled: boolean;
+  configurationVersion: number;
+  environmentImported: boolean;
+  lidarr: HubServiceSettings & {
+    rootFolder: string;
+    qualityProfileId: number;
+    metadataProfileId: number;
+  };
+  lazyLibrarian: HubServiceSettings;
+  homeAssistant: { webhookUrl?: HubSecretValue };
+  metadata: { contactEmail: string; userAgent: string };
+  defaults: {
+    languages: string[];
+    bookFormats: ('ebook' | 'audiobook')[];
+  };
+  quota: {
+    enabled: boolean;
+    defaultPoints: number;
+    windowDays: number;
+    weights: Record<string, number>;
+  };
+  sync: { intervalMinutes: number };
+}
+
 export interface SonarrSettings extends DVRSettings {
   seriesType: 'standard' | 'daily' | 'anime';
   animeSeriesType: 'standard' | 'daily' | 'anime';
@@ -371,7 +408,8 @@ export type JobId =
   | 'jellyfin-full-scan'
   | 'image-cache-cleanup'
   | 'availability-sync'
-  | 'process-blocklisted-tags';
+  | 'process-blocklisted-tags'
+  | 'hub-reconciliation';
 
 export interface AllSettings {
   clientId: string;
@@ -385,6 +423,7 @@ export interface AllSettings {
   radarr: RadarrSettings[];
   sonarr: SonarrSettings[];
   lidarr: LidarrSettings[];
+  hub: HubSettings;
   public: PublicSettings;
   notifications: NotificationSettings;
   jobs: Record<JobId, JobSettings>;
@@ -462,6 +501,36 @@ class Settings {
       radarr: [],
       sonarr: [],
       lidarr: [],
+      hub: {
+        enabled: true,
+        configurationVersion: 2,
+        environmentImported: false,
+        lidarr: {
+          url: '',
+          rootFolder: '/music',
+          qualityProfileId: 0,
+          metadataProfileId: 0,
+        },
+        lazyLibrarian: { url: '' },
+        homeAssistant: {},
+        metadata: { contactEmail: '', userAgent: '' },
+        defaults: { languages: ['de', 'en'], bookFormats: ['ebook'] },
+        quota: {
+          enabled: false,
+          defaultPoints: 10,
+          windowDays: 30,
+          weights: {
+            movie: 1,
+            tv: 3,
+            music_album: 1,
+            music_artist: 5,
+            ebook: 1,
+            audiobook: 2,
+            book_both: 3,
+          },
+        },
+        sync: { intervalMinutes: 5 },
+      },
       public: {
         initialized: false,
       },
@@ -612,6 +681,9 @@ class Settings {
         'process-blocklisted-tags': {
           schedule: '0 30 1 */7 * *',
         },
+        'hub-reconciliation': {
+          schedule: '0 */5 * * * *',
+        },
       },
       network: {
         csrfProtection: false,
@@ -706,6 +778,14 @@ class Settings {
 
   set lidarr(data: LidarrSettings[]) {
     this.data.lidarr = data;
+  }
+
+  get hub(): HubSettings {
+    return this.data.hub;
+  }
+
+  set hub(data: HubSettings) {
+    this.data.hub = mergeSettings(this.data.hub, data);
   }
 
   get public(): PublicSettings {
@@ -887,8 +967,11 @@ class Settings {
   public async save(): Promise<void> {
     const savePromise = this.saveLock.then(async () => {
       const tmp = SETTINGS_PATH + '.tmp';
-      await fs.writeFile(tmp, JSON.stringify(this.data, undefined, ' '));
+      await fs.writeFile(tmp, JSON.stringify(this.data, undefined, ' '), {
+        mode: 0o600,
+      });
       await fs.rename(tmp, SETTINGS_PATH);
+      await fs.chmod(SETTINGS_PATH, 0o600);
     });
 
     this.saveLock = savePromise.catch(() => {
