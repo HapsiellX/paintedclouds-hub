@@ -9,11 +9,19 @@ process.env.CONFIG_DIRECTORY = directory;
 process.env.HUB_LIDARR_URL = 'http://lidarr:8686';
 process.env.HUB_LIDARR_API_KEY = 'legacy-lidarr-secret';
 process.env.HUB_METADATA_CONTACT_EMAIL = 'hub@example.test';
+process.env.HUB_PROWLARR_URL = 'http://prowlarr:9696';
+process.env.HUB_PROWLARR_API_KEY = 'legacy-prowlarr-secret';
+process.env.HUB_SABNZBD_URL = 'http://sabnzbd:8080';
+process.env.HUB_SABNZBD_API_KEY = 'legacy-sabnzbd-secret';
 
 after(() => {
   delete process.env.HUB_LIDARR_URL;
   delete process.env.HUB_LIDARR_API_KEY;
   delete process.env.HUB_METADATA_CONTACT_EMAIL;
+  delete process.env.HUB_PROWLARR_URL;
+  delete process.env.HUB_PROWLARR_API_KEY;
+  delete process.env.HUB_SABNZBD_URL;
+  delete process.env.HUB_SABNZBD_API_KEY;
   fs.rmSync(directory, { recursive: true, force: true });
 });
 
@@ -33,5 +41,31 @@ describe('PaintedClouds Hub V0.1 settings import', () => {
       'legacy-lidarr-secret'
     );
     assert.deepEqual(migrate(structuredClone(migrated)), migrated);
+  });
+
+  it('imports V0.2 status integrations into encrypted V0.3 settings once', async () => {
+    const migrateV02 = (
+      await import('@server/lib/settings/migrations/0010_migrate_hub_status_integrations')
+    ).default;
+    const { decryptHubSecret } = await import('@server/lib/hub/secrets');
+    const input = {
+      migrations: [],
+      hub: { configurationVersion: 2 },
+    } as never;
+    const migrated = migrateV02(input);
+    assert.equal(migrated.hub.configurationVersion, 3);
+    assert.equal(migrated.hub.prowlarr.url, 'http://prowlarr:9696');
+    assert.equal(migrated.hub.sabnzbd.url, 'http://sabnzbd:8080');
+    assert.ok(!JSON.stringify(migrated).includes('legacy-prowlarr-secret'));
+    assert.ok(!JSON.stringify(migrated).includes('legacy-sabnzbd-secret'));
+    assert.equal(
+      decryptHubSecret(migrated.hub.prowlarr.apiKey, 'prowlarr-api-key'),
+      'legacy-prowlarr-secret'
+    );
+    assert.equal(
+      decryptHubSecret(migrated.hub.sabnzbd.apiKey, 'sabnzbd-api-key'),
+      'legacy-sabnzbd-secret'
+    );
+    assert.deepEqual(migrateV02(structuredClone(migrated)), migrated);
   });
 });

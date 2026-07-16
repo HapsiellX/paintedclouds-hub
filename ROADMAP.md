@@ -4,9 +4,9 @@ This roadmap communicates direction, not a promise of scope or delivery date.
 Security, data integrity, upstream changes, and maintainer capacity can reorder
 the work.
 
-## V0.2 Stable Scope
+## V0.3 Product Scope
 
-V0.2 establishes the first stable PaintedClouds Hub foundation:
+V0.3 turns the technical Hub foundation into one coherent media home:
 
 - Unified search, discovery, canonical detail pages, and request activity for
   movies, television, artists, albums, e-books, and audiobooks.
@@ -20,6 +20,12 @@ V0.2 establishes the first stable PaintedClouds Hub foundation:
   administrator health and retry controls.
 - Reproducible release candidates, exact-digest promotion, SBOMs, provenance,
   signed artifacts, and documented upgrade and rollback procedures.
+- A single cross-media home and global search with direct movie, series, music,
+  book and activity navigation.
+- First-class encrypted Prowlarr and SABnzbd health configuration.
+- Project-owned updater, release information, support links, Helm metadata and
+  artifact verification instructions.
+- Concurrency-safe management actions and hardened outbound integration calls.
 
 ## Next Product Work
 

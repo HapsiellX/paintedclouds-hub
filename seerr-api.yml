@@ -2259,6 +2259,15 @@ paths:
                   appDataPermissions:
                     type: boolean
                     example: true
+  /status/releases:
+    get:
+      summary: Get sanitized PaintedClouds Hub release metadata
+      description: Returns cached non-draft releases from the official project repository.
+      tags:
+        - public
+      responses:
+        '200':
+          description: PaintedClouds Hub releases
   /settings/main:
     get:
       summary: Get main settings
@@ -8396,6 +8405,7 @@ paths:
           schema: { type: integer }
       responses:
         '200': { description: Approved request }
+        '409': { description: Request is no longer pending }
   /hub/requests/{id}/history:
     get:
       summary: Get the sanitized state history for a visible Hub request
@@ -8419,6 +8429,7 @@ paths:
           schema: { type: integer }
       responses:
         '200': { description: Retried request }
+        '409': { description: Request is not failed }
   /hub/requests/{id}/decline:
     post:
       summary: Decline a pending Hub request
@@ -8438,6 +8449,7 @@ paths:
                 reason: { type: string, maxLength: 500 }
       responses:
         '200': { description: Declined request }
+        '409': { description: Request is no longer pending }
   /hub/reconciliation:
     get:
       summary: Get Hub reconciliation job status
@@ -8476,7 +8488,8 @@ paths:
         - in: path
           name: service
           required: true
-          schema: { type: string, enum: [lidarr, lazylibrarian] }
+          schema:
+            { type: string, enum: [lidarr, lazylibrarian, prowlarr, sabnzbd] }
       responses:
         '200': { description: Connection succeeded }
 security:

@@ -46,6 +46,8 @@ const migrateHubSettings = (settings: any): AllSettings => {
         ? encryptHubSecret(lazyLibrarianKey, 'lazylibrarian-api-key')
         : undefined,
     },
+    prowlarr: { url: '' },
+    sabnzbd: { url: '' },
     homeAssistant: {
       webhookUrl: webhook
         ? encryptHubSecret(webhook, 'home-assistant-webhook')

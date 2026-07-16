@@ -366,7 +366,7 @@ const NotificationsWebhook = () => {
             {values.supportVariables && (
               <div className="mt-2">
                 <Link
-                  href="https://docs.seerr.dev/using-seerr/notifications/webhook#template-variables"
+                  href="https://github.com/HapsiellX/paintedclouds-hub/blob/main/docs/using-seerr/notifications/webhook.mdx#template-variables"
                   passHref
                   legacyBehavior
                 >
@@ -534,7 +534,7 @@ const NotificationsWebhook = () => {
                     <span>{intl.formatMessage(messages.resetPayload)}</span>
                   </Button>
                   <Link
-                    href="https://docs.seerr.dev/using-seerr/notifications/webhook#template-variables"
+                    href="https://github.com/HapsiellX/paintedclouds-hub/blob/main/docs/using-seerr/notifications/webhook.mdx#template-variables"
                     passHref
                     legacyBehavior
                   >

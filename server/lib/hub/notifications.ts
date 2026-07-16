@@ -17,7 +17,14 @@ export const notifyHomeAssistant = async (
   const url = webhookUrl();
   if (!url) return;
   try {
-    await axios.post(url, { event, ...payload }, { timeout: 5_000 });
+    await axios.post(
+      url,
+      { event, ...payload },
+      {
+        timeout: 5_000,
+        maxRedirects: 0,
+      }
+    );
   } catch (e) {
     logger.warn('Home Assistant notification failed', {
       label: 'PaintedClouds Hub',

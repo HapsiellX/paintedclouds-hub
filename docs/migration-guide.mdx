@@ -72,7 +72,7 @@ Summary of changes :
   ---
   services:
     seerr:
-      image: ghcr.io/seerr-team/seerr:latest
+      image: ghcr.io/hapsiellx/paintedclouds-hub:0.3.0
       init: true
       container_name: seerr
       environment:
@@ -103,7 +103,7 @@ Summary of changes :
     -p 5055:5055 \
     -v /path/to/appdata/config:/app/config \
     --restart unless-stopped \
-    ghcr.io/seerr-team/seerr:latest
+    ghcr.io/hapsiellx/paintedclouds-hub:0.3.0
   ```
   </TabItem>
 </Tabs>
@@ -117,7 +117,7 @@ Summary of changes :
   ---
   services:
     seerr:
-      image: ghcr.io/seerr-team/seerr:latest
+      image: ghcr.io/hapsiellx/paintedclouds-hub:0.3.0
       init: true
       container_name: seerr
       environment:
@@ -151,7 +151,7 @@ Summary of changes :
     -p 5055:5055 `
     -v seerr-data:/app/config `
     --restart unless-stopped `
-    ghcr.io/seerr-team/seerr:latest
+    ghcr.io/hapsiellx/paintedclouds-hub:0.3.0
   ```
   </TabItem>
 
@@ -166,7 +166,7 @@ Summary of changes :
     -p 5055:5055 ^
     -v seerr-data:/app/config ^
     --restart unless-stopped ^
-    ghcr.io/seerr-team/seerr:latest
+    ghcr.io/hapsiellx/paintedclouds-hub:0.3.0
   ```
   </TabItem>
 </Tabs>
@@ -198,7 +198,7 @@ Summary of changes :
   <TabItem value="new" label="New values">
   ```yaml
   image:
-    repository: seerr-team/seerr
+    repository: hapsiellx/paintedclouds-hub
   podSecurityContext:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch

@@ -67,13 +67,18 @@ const lidarrState = async (request: HubRequest): Promise<HubRequestState> => {
     request.kind === HubMediaKind.MUSIC_ARTIST ? 'artist' : 'album';
   const response = await axios.get(
     `${config.url}/api/v1/${resource}/${encodeURIComponent(request.targetId)}`,
-    { timeout: 10_000, headers: { 'X-Api-Key': config.apiKey } }
+    {
+      timeout: 10_000,
+      maxRedirects: 0,
+      headers: { 'X-Api-Key': config.apiKey },
+    }
   );
   const statistics = response.data.statistics ?? {};
   const importedState = lidarrStatisticsState(statistics);
   if (importedState) return importedState;
   const queue = await axios.get(`${config.url}/api/v1/queue`, {
     timeout: 10_000,
+    maxRedirects: 0,
     headers: { 'X-Api-Key': config.apiKey },
     params: { page: 1, pageSize: 100 },
   });
@@ -91,6 +96,7 @@ const lazyLibrarianState = async (
   if (!config.url || !config.apiKey || !request.targetId) return request.state;
   const response = await axios.get(`${config.url}/api`, {
     timeout: 10_000,
+    maxRedirects: 0,
     params: { apikey: config.apiKey, cmd: 'getBook', id: request.targetId },
   });
   const book = Array.isArray(response.data)

@@ -9,6 +9,7 @@ import type { NotificationAgentEmail } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
+import { getAppVersion } from '@server/utils/appVersion';
 import type { EmailOptions } from 'email-templates';
 import path from 'path';
 import validator from 'validator';
@@ -16,8 +17,13 @@ import { Notification, shouldSendAdminNotification } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
 
-const PUBLIC_LOGO_URL =
-  'https://raw.githubusercontent.com/seerr-team/seerr/refs/heads/develop/public/logo_full.svg';
+const publicLogoUrl = () => {
+  const version = getAppVersion();
+  const ref = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)
+    ? `v${version}`
+    : 'main';
+  return `https://raw.githubusercontent.com/HapsiellX/paintedclouds-hub/${ref}/public/logo_full.svg`;
+};
 
 const messages = defineMessages('notifications.agents.email', {
   issueType: '{type} issue',
@@ -101,7 +107,7 @@ class EmailAgent
     const { embedPoster } = settings.notifications.agents.email;
     const { usePublicLogo } = settings.notifications.agents.email.options;
     const logoUrl = usePublicLogo
-      ? PUBLIC_LOGO_URL
+      ? publicLogoUrl()
       : applicationUrl
         ? `${applicationUrl}/logo_full.svg`
         : undefined;

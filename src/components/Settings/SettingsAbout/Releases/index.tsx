@@ -28,30 +28,19 @@ const messages = defineMessages('components.Settings.SettingsAbout.Releases', {
   viewchangelog: 'View Changelog',
 });
 
-const REPO_RELEASE_API =
-  'https://api.github.com/repos/seerr-team/seerr/releases?per_page=20';
-
-interface GitHubRelease {
-  url: string;
-  assets_url: string;
-  upload_url: string;
-  html_url: string;
+interface ProjectRelease {
   id: number;
-  node_id: string;
-  tag_name: string;
-  target_commitish: string;
+  tagName: string;
   name: string;
-  draft: boolean;
   prerelease: boolean;
-  created_at: string;
-  published_at: string;
-  tarball_url: string;
-  zipball_url: string;
+  htmlUrl: string;
+  createdAt: string;
+  publishedAt: string;
   body: string;
 }
 
 interface ReleaseProps {
-  release: GitHubRelease;
+  release: ProjectRelease;
   isLatest: boolean;
   currentVersion: string;
 }
@@ -80,7 +69,7 @@ const Release = ({ currentVersion, release, isLatest }: ReleaseProps) => {
           cancelText={intl.formatMessage(globalMessages.close)}
           okText={intl.formatMessage(messages.viewongithub)}
           onOk={() => {
-            window.open(release.html_url, '_blank');
+            window.open(release.htmlUrl, '_blank', 'noopener,noreferrer');
           }}
         >
           <div className="prose">
@@ -93,7 +82,9 @@ const Release = ({ currentVersion, release, isLatest }: ReleaseProps) => {
           <span className="mr-2 whitespace-nowrap text-xs font-normal">
             <FormattedRelativeTime
               value={Math.floor(
-                (new Date(release.created_at).getTime() - Date.now()) / 1000
+                (new Date(release.publishedAt || release.createdAt).getTime() -
+                  Date.now()) /
+                  1000
               )}
               updateIntervalInSeconds={1}
               numeric="auto"
@@ -106,7 +97,7 @@ const Release = ({ currentVersion, release, isLatest }: ReleaseProps) => {
             {intl.formatMessage(messages.latestversion)}
           </Badge>
         )}
-        {release.name.includes(currentVersion) && (
+        {release.tagName.replace(/^v/, '') === currentVersion && (
           <Badge badgeType="primary">
             {intl.formatMessage(messages.currentversion)}
           </Badge>
@@ -126,7 +117,7 @@ interface ReleasesProps {
 
 const Releases = ({ currentVersion }: ReleasesProps) => {
   const intl = useIntl();
-  const { data, error } = useSWR<GitHubRelease[]>(REPO_RELEASE_API);
+  const { data, error } = useSWR<ProjectRelease[]>('/api/v1/status/releases');
 
   if (!data && !error) {
     return <LoadingSpinner />;

@@ -91,6 +91,7 @@ const submitBook = async (request: HubRequest): Promise<string> => {
   const call = async (cmd: string, params: Record<string, unknown> = {}) =>
     axios.get(`${url}/api`, {
       timeout: 15_000,
+      maxRedirects: 0,
       params: { apikey: apiKey, cmd, ...params },
     });
   const found = await call('findBook', {

@@ -108,6 +108,7 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
       {
         nodeCache: cacheManager.getCache(cacheName).data,
         timeout,
+        maxRedirects: 0,
       }
     );
 

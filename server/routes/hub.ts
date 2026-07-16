@@ -163,6 +163,26 @@ const sanitizeCatalogResult = <T extends { errors: string[] }>(result: T): T =>
     errors: result.errors.length ? [providerUnavailableMessage] : [],
   }) as T;
 
+const mapWithConcurrency = async <T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex++;
+        results[index] = await mapper(items[index]);
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+};
+
 const addAudit = async (
   request: HubRequest,
   action: string,
@@ -396,66 +416,65 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       ) ?? []
   );
   const activityQuery = parsed.data.query?.toLocaleLowerCase();
+  const sourceLimit = Math.min(100, parsed.data.skip + take * 2);
   const [hubRequests, videoRequests] = await Promise.all([
     getRepository(HubRequest).find({
       where: admin ? {} : { requestedBy: { id: user.id } },
       order: { createdAt: 'DESC' },
-      take: 500,
+      take: sourceLimit,
     }),
     getRepository(MediaRequest).find({
       where: admin ? {} : { requestedBy: { id: user.id } },
       order: { createdAt: 'DESC' },
-      take: 500,
+      take: sourceLimit,
     }),
   ]);
   const tmdb = new TheMovieDb();
-  const video = await Promise.all(
-    videoRequests.map(async (request) => {
-      const detail = await (
-        request.type === MediaType.MOVIE
-          ? tmdb.getMovie({
-              movieId: request.media.tmdbId,
-              language: req.locale,
-            })
-          : tmdb.getTvShow({ tvId: request.media.tmdbId, language: req.locale })
-      ).catch(() => undefined);
-      const state =
-        request.status === MediaRequestStatus.PENDING
-          ? HubRequestState.PENDING
-          : request.status === MediaRequestStatus.DECLINED
-            ? HubRequestState.DECLINED
-            : request.status === MediaRequestStatus.FAILED
-              ? HubRequestState.FAILED
-              : request.media.status === MediaStatus.AVAILABLE
-                ? HubRequestState.AVAILABLE
-                : request.status === MediaRequestStatus.COMPLETED
-                  ? HubRequestState.IMPORTED
-                  : HubRequestState.SUBMITTED;
-      return {
-        id: `video:${request.id}`,
-        source: 'seerr' as const,
-        sourceId: request.id,
-        kind: request.type,
-        title:
-          detail && 'title' in detail
-            ? detail.title
-            : detail && 'name' in detail
-              ? detail.name
-              : `${request.type === MediaType.MOVIE ? 'Film' : 'Serie'} #${request.media.tmdbId}`,
-        imageUrl: detail?.poster_path
-          ? `https://image.tmdb.org/t/p/w500${detail.poster_path}`
-          : undefined,
-        state,
-        requestedBy: {
-          id: request.requestedBy.id,
-          displayName: request.requestedBy.displayName,
-          avatar: request.requestedBy.avatar,
-        },
-        createdAt: request.createdAt,
-        updatedAt: request.updatedAt,
-      };
-    })
-  );
+  const video = await mapWithConcurrency(videoRequests, 8, async (request) => {
+    const detail = await (
+      request.type === MediaType.MOVIE
+        ? tmdb.getMovie({
+            movieId: request.media.tmdbId,
+            language: req.locale,
+          })
+        : tmdb.getTvShow({ tvId: request.media.tmdbId, language: req.locale })
+    ).catch(() => undefined);
+    const state =
+      request.status === MediaRequestStatus.PENDING
+        ? HubRequestState.PENDING
+        : request.status === MediaRequestStatus.DECLINED
+          ? HubRequestState.DECLINED
+          : request.status === MediaRequestStatus.FAILED
+            ? HubRequestState.FAILED
+            : request.media.status === MediaStatus.AVAILABLE
+              ? HubRequestState.AVAILABLE
+              : request.status === MediaRequestStatus.COMPLETED
+                ? HubRequestState.IMPORTED
+                : HubRequestState.SUBMITTED;
+    return {
+      id: `video:${request.id}`,
+      source: 'seerr' as const,
+      sourceId: request.id,
+      kind: request.type,
+      title:
+        detail && 'title' in detail
+          ? detail.title
+          : detail && 'name' in detail
+            ? detail.name
+            : `${request.type === MediaType.MOVIE ? 'Film' : 'Serie'} #${request.media.tmdbId}`,
+      imageUrl: detail?.poster_path
+        ? `https://image.tmdb.org/t/p/w500${detail.poster_path}`
+        : undefined,
+      state,
+      requestedBy: {
+        id: request.requestedBy.id,
+        displayName: request.requestedBy.displayName,
+        avatar: request.requestedBy.avatar,
+      },
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+    };
+  });
   const hub = hubRequests.map((request) => ({
     ...toHubRequestDto(request, { admin }),
     id: `hub:${request.id}`,
@@ -659,14 +678,24 @@ hubRoutes.post(
     const id = idSchema.safeParse(req.params.id);
     if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
     const repository = getRepository(HubRequest);
+    const claimed = await repository.update(
+      { id: id.data, state: HubRequestState.PENDING },
+      {
+        state: HubRequestState.PROCESSING,
+        approvedBy: actor,
+        approvedAt: new Date(),
+        errorMessage: null,
+      }
+    );
+    if (claimed.affected !== 1) {
+      return res.status(409).json({
+        message: 'Der Wunsch ist nicht mehr zur Freigabe verfügbar.',
+      });
+    }
     let request = await repository.findOneByOrFail({ id: id.data });
-    request.state = HubRequestState.APPROVED;
-    request.approvedBy = actor;
-    request.approvedAt = new Date();
-    request.errorMessage = null;
-    await repository.save(request);
     try {
       request = await repository.save(await submitHubRequest(request));
+      await consumeHubQuota(request.id);
       await addAudit(request, 'approved_and_submitted', actor);
     } catch {
       request.state = HubRequestState.FAILED;
@@ -689,6 +718,15 @@ hubRoutes.post(
     const id = idSchema.safeParse(req.params.id);
     if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
     const repository = getRepository(HubRequest);
+    const claimed = await repository.update(
+      { id: id.data, state: HubRequestState.FAILED },
+      { state: HubRequestState.PROCESSING, errorMessage: null }
+    );
+    if (claimed.affected !== 1) {
+      return res.status(409).json({
+        message: 'Nur fehlgeschlagene Wünsche können erneut versucht werden.',
+      });
+    }
     let request = await repository.findOneByOrFail({ id: id.data });
     try {
       request = await repository.save(await submitHubRequest(request));
@@ -718,16 +756,23 @@ hubRoutes.post(
       return res.status(400).json({ message: 'Ungültiger Ablehnungsgrund.' });
     }
     const repository = getRepository(HubRequest);
-    const request = await repository.findOneByOrFail({
-      id: id.data,
-    });
-    request.state = HubRequestState.DECLINED;
-    request.errorMessage = String(
-      body.data.reason ?? 'Vom Administrator abgelehnt'
+    const reason = String(body.data.reason ?? 'Vom Administrator abgelehnt');
+    const declined = await repository.update(
+      { id: id.data, state: HubRequestState.PENDING },
+      {
+        state: HubRequestState.DECLINED,
+        errorMessage: reason,
+      }
     );
-    await repository.save(request);
+    if (declined.affected !== 1) {
+      return res.status(409).json({
+        message: 'Nur wartende Wünsche können abgelehnt werden.',
+      });
+    }
+    const request = await repository.findOneByOrFail({ id: id.data });
+    await releaseHubQuota(request.id);
     await addAudit(request, 'declined', actor, {
-      reason: request.errorMessage,
+      reason,
     });
     return res.json(toHubRequestDto(request, { admin: true }));
   }
