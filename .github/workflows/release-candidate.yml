@@ -66,11 +66,13 @@ jobs:
             echo "package.json version $package_version does not match ${VERSION#v}" >&2
             exit 1
           fi
-          echo "sha=$REQUESTED_SHA" >> "$GITHUB_OUTPUT"
-          echo "short_sha=${REQUESTED_SHA:0:12}" >> "$GITHUB_OUTPUT"
-          echo "epoch=$(git show -s --format=%ct "$REQUESTED_SHA")" >> "$GITHUB_OUTPUT"
-          echo "date=$(git show -s --format=%cI "$REQUESTED_SHA")" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha=$REQUESTED_SHA"
+            echo "short_sha=${REQUESTED_SHA:0:12}"
+            echo "epoch=$(git show -s --format=%ct "$REQUESTED_SHA")"
+            echo "date=$(git show -s --format=%cI "$REQUESTED_SHA")"
+            echo "version=${VERSION#v}"
+          } >> "$GITHUB_OUTPUT"
 
   build:
     name: Build and smoke-test (${{ matrix.arch }})
@@ -142,7 +144,7 @@ jobs:
             --publish 127.0.0.1::5055 "$IMAGE@$DIGEST")
           trap 'docker logs "$container_id" || true; docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
           port=$(docker port "$container_id" 5055/tcp | awk -F: '{print $NF}')
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl --fail --silent "http://127.0.0.1:${port}/api/v1/status" >/dev/null; then
               exit 0
             fi
