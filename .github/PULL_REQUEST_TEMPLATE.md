@@ -1,33 +1,40 @@
-<!--
-    Please read contributing guide before submitting
-    your pull request. Please fill in each section below to help us better prioritize your pull request. Thanks!
--->
+## Purpose
 
-## Description
+<!-- What problem does this solve? Keep the change focused. -->
 
-<!--- Describe your changes in detail -->
-<!--- Why is this change required? What problem does it solve? -->
-<!--- If it fixes an open issue, please link to the issue here. -->
+Closes #
 
-- Fixes #XXXX
+## Changes
 
-## How Has This Been Tested?
+<!-- Describe user-visible behavior, technical scope, and intentional exclusions. -->
 
-<!--- Please describe in detail how you tested your changes. -->
-<!--- Include details of your testing environment, and the tests you ran to -->
-<!--- see how your change affects other areas of the code, etc. -->
+## Validation
 
-## Screenshots / Logs (if applicable)
+<!-- List exact commands and manual scenarios. Do not include secrets or private logs. -->
 
-## Checklist:
+## Risk and Rollback
 
-<!--- Go over all the following points, and put an `x` in all the boxes that apply. -->
-<!--- If you're unsure about any of these, don't hesitate to ask. We're here to help! -->
+<!-- Cover migrations, compatibility, privacy, external APIs, and rollback where relevant. -->
 
-- [ ] I have read and followed the contribution [guidelines](https://github.com/seerr-team/seerr/blob/develop/CONTRIBUTING.md).
-- [ ] Disclosed any use of AI (see our [policy](https://github.com/seerr-team/seerr/blob/develop/CONTRIBUTING.md#ai-assistance-notice))
-- [ ] I have updated the documentation accordingly.
-- [ ] All new and existing tests passed.
-- [ ] Successful build `pnpm build`
-- [ ] Translation keys `pnpm i18n:extract`
-- [ ] Database migration (if required)
+## Screenshots
+
+<!-- Required for visual changes. Use sanitized test data. -->
+
+## AI Assistance
+
+<!-- State None, or identify how AI assisted and how the output was reviewed. -->
+
+## Checklist
+
+- [ ] I read and followed `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+- [ ] I understand and reviewed every submitted change.
+- [ ] I disclosed material AI assistance above.
+- [ ] I added or updated relevant tests and documentation.
+- [ ] I considered security, privacy, licensing, and third-party terms.
+- [ ] I did not include credentials, personal data, or private infrastructure.
+- [ ] `pnpm format:check` passes.
+- [ ] `pnpm lint` passes, or this is a documentation-only change.
+- [ ] `pnpm typecheck` passes, or this is a documentation-only change.
+- [ ] `pnpm test` passes, or this is a documentation-only change.
+- [ ] `pnpm build` passes when code or build configuration changed.
+- [ ] I updated translations, `seerr-api.yml`, and both database backends where applicable.
