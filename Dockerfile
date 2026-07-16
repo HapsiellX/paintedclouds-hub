@@ -74,7 +74,12 @@ LABEL org.opencontainers.image.title="PaintedClouds Hub" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.licenses="MIT"
 
-RUN apk add --no-cache tzdata=2026c-r0
+RUN apk add --no-cache \
+  libcrypto3=3.5.7-r0 \
+  libssl3=3.5.7-r0 \
+  tzdata=2026c-r0 && \
+  rm -rf /usr/local/lib/node_modules/npm && \
+  rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 WORKDIR /app
 
@@ -98,4 +103,4 @@ EXPOSE 5055
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD wget --quiet --output-document=/dev/null http://127.0.0.1:5055/api/v1/status || exit 1
 
-CMD [ "npm", "start" ]
+CMD [ "node", "dist/index.js" ]
