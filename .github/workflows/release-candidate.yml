@@ -48,6 +48,7 @@ jobs:
         env:
           REQUESTED_SHA: ${{ inputs.candidate_sha }}
           VERSION: ${{ inputs.version }}
+          WORKFLOW_SHA: ${{ github.sha }}
         run: |
           if [[ ! "$VERSION" =~ ^v0\.[0-9]+\.[0-9]+-(alpha|beta)\.[0-9]+$ ]]; then
             echo 'Only v0.x.y-alpha.n and v0.x.y-beta.n prereleases are allowed' >&2
@@ -57,9 +58,9 @@ jobs:
             echo 'candidate_sha must be a full lowercase Git SHA' >&2
             exit 1
           fi
-          git fetch --no-tags origin main
           git cat-file -e "${REQUESTED_SHA}^{commit}"
-          git merge-base --is-ancestor "$REQUESTED_SHA" origin/main
+          git cat-file -e "${WORKFLOW_SHA}^{commit}"
+          git merge-base --is-ancestor "$REQUESTED_SHA" "$WORKFLOW_SHA"
           package_version=$(git show "$REQUESTED_SHA:package.json" | node -e \
             "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))")
           if [[ "$package_version" != "${VERSION#v}" ]]; then
