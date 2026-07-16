@@ -98,6 +98,8 @@ spec:
             - name: config
               mountPath: /app/config
               subPath: {{ .Values.config.persistence.subPath }}
+            - name: tmp
+              mountPath: /tmp
           {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -105,6 +107,8 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: {{ if .Values.config.persistence.existingClaim }}{{ .Values.config.persistence.existingClaim }}{{- else }}{{ include "seerr.configPersistenceName" . }}{{- end }}
+        - name: tmp
+          emptyDir: {}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
