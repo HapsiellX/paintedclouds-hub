@@ -3,7 +3,7 @@ describe('PaintedClouds Hub', () => {
     cy.request('POST', '/api/v1/auth/jellyfin', {
       username: Cypress.env('JELLYFIN_USERNAME'),
       password: Cypress.env('JELLYFIN_PASSWORD'),
-      email: 'kardo@paintedclouds.com',
+      email: 'hub-admin@example.com',
     });
   });
 

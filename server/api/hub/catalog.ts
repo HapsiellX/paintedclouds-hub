@@ -4,6 +4,7 @@ import type {
   TmdbTvResult,
 } from '@server/api/themoviedb/interfaces';
 import { HubMediaKind } from '@server/constants/hub';
+import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import rateLimit from 'axios-rate-limit';
 
@@ -69,14 +70,51 @@ interface OpenLibraryWorksResponse {
   }[];
 }
 
+interface MusicBrainzArtistDetail {
+  id: string;
+  name: string;
+  disambiguation?: string;
+  country?: string;
+}
+
+interface MusicBrainzReleaseGroupDetail {
+  id: string;
+  title: string;
+  'artist-credit'?: { name: string }[];
+  'first-release-date'?: string;
+}
+
+interface OpenLibraryWorkDetail {
+  key: string;
+  title: string;
+  covers?: number[];
+  authors?: { author?: { key?: string } }[];
+}
+
+interface OpenLibraryAuthorDetail {
+  name?: string;
+}
+
+interface HubCatalogClients {
+  musicBrainz: Pick<AxiosInstance, 'get'>;
+  openLibrary: Pick<AxiosInstance, 'get'>;
+}
+
+export class HubCatalogItemNotFoundError extends Error {}
+
+const metadataContactEmail = process.env.HUB_METADATA_CONTACT_EMAIL?.trim();
+const metadataUserAgent =
+  process.env.HUB_METADATA_USER_AGENT?.trim() ||
+  `PaintedCloudsHub/0.1${
+    metadataContactEmail ? ` (mailto:${metadataContactEmail})` : ''
+  }`;
+
 const musicBrainz = rateLimit(
   axios.create({
     baseURL: 'https://musicbrainz.org/ws/2',
     timeout: 10_000,
     headers: {
-      'User-Agent':
-        process.env.HUB_METADATA_USER_AGENT ??
-        'PaintedCloudsHub/1.0 (https://paintedclouds.com)',
+      'User-Agent': metadataUserAgent,
     },
   }),
   { maxRequests: 1, perMilliseconds: 1_000 }
@@ -86,13 +124,12 @@ const openLibrary = rateLimit(
   axios.create({
     baseURL: 'https://openlibrary.org',
     timeout: 10_000,
+    params: metadataContactEmail ? { email: metadataContactEmail } : undefined,
     headers: {
-      'User-Agent':
-        process.env.HUB_METADATA_USER_AGENT ??
-        'PaintedCloudsHub/1.0 (https://paintedclouds.com)',
+      'User-Agent': metadataUserAgent,
     },
   }),
-  { maxRequests: 3, perMilliseconds: 1_000 }
+  { maxRequests: metadataContactEmail ? 3 : 1, perMilliseconds: 1_000 }
 );
 
 const searchVideo = async (
@@ -398,4 +435,163 @@ export const searchHubCatalog = async ({
     results: results.filter((item) => kinds.includes(item.kind)),
     errors,
   };
+};
+
+const canonicalText = (
+  value: unknown,
+  maximumLength: number
+): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, maximumLength) : undefined;
+};
+
+const resolveOpenLibraryAuthors = async (
+  work: OpenLibraryWorkDetail,
+  client: HubCatalogClients['openLibrary']
+): Promise<string | undefined> => {
+  const authorKeys = (work.authors ?? [])
+    .flatMap((entry) => (entry.author?.key ? [entry.author.key] : []))
+    .filter((key) => /^\/authors\/OL\d+A$/i.test(key))
+    .slice(0, 5);
+  const authors = await Promise.allSettled(
+    authorKeys.map(async (key) => {
+      const response = await client.get<OpenLibraryAuthorDetail>(`${key}.json`);
+      return canonicalText(response.data.name, 200);
+    })
+  );
+  return canonicalText(
+    authors
+      .flatMap((author) =>
+        author.status === 'fulfilled' && author.value ? [author.value] : []
+      )
+      .join(', '),
+    500
+  );
+};
+
+export const resolveHubCatalogItem = async (
+  input: {
+    kind: HubMediaKind;
+    provider: 'musicbrainz' | 'openlibrary';
+    externalId: string;
+  },
+  clients: HubCatalogClients = { musicBrainz, openLibrary }
+): Promise<HubCatalogItem> => {
+  const musicId =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const validIdentity =
+    (input.provider === 'musicbrainz' &&
+      (input.kind === HubMediaKind.MUSIC_ARTIST ||
+        input.kind === HubMediaKind.MUSIC_ALBUM) &&
+      musicId.test(input.externalId)) ||
+    (input.provider === 'openlibrary' &&
+      input.kind === HubMediaKind.BOOK &&
+      /^OL\d+W$/i.test(input.externalId));
+  if (!validIdentity) throw new HubCatalogItemNotFoundError();
+
+  try {
+    if (
+      input.provider === 'musicbrainz' &&
+      input.kind === HubMediaKind.MUSIC_ARTIST
+    ) {
+      const response = await clients.musicBrainz.get<MusicBrainzArtistDetail>(
+        `/artist/${encodeURIComponent(input.externalId)}`,
+        { params: { fmt: 'json' } }
+      );
+      const title = canonicalText(response.data.name, 500);
+      if (
+        response.data.id.toLowerCase() !== input.externalId.toLowerCase() ||
+        !title
+      ) {
+        throw new HubCatalogItemNotFoundError();
+      }
+      return {
+        kind: input.kind,
+        provider: input.provider,
+        externalId: response.data.id.toLowerCase(),
+        title,
+        subtitle: canonicalText(
+          [response.data.disambiguation, response.data.country]
+            .filter(Boolean)
+            .join(' · '),
+          500
+        ),
+      };
+    }
+
+    if (
+      input.provider === 'musicbrainz' &&
+      input.kind === HubMediaKind.MUSIC_ALBUM
+    ) {
+      const response =
+        await clients.musicBrainz.get<MusicBrainzReleaseGroupDetail>(
+          `/release-group/${encodeURIComponent(input.externalId)}`,
+          { params: { fmt: 'json' } }
+        );
+      const title = canonicalText(response.data.title, 500);
+      if (
+        response.data.id.toLowerCase() !== input.externalId.toLowerCase() ||
+        !title
+      ) {
+        throw new HubCatalogItemNotFoundError();
+      }
+      return {
+        kind: input.kind,
+        provider: input.provider,
+        externalId: response.data.id.toLowerCase(),
+        title,
+        subtitle: canonicalText(
+          (response.data['artist-credit'] ?? [])
+            .map((credit) => credit.name)
+            .join(', '),
+          500
+        ),
+        imageUrl: `https://coverartarchive.org/release-group/${response.data.id.toLowerCase()}/front-500`,
+        year: response.data['first-release-date']
+          ? Number(response.data['first-release-date'].slice(0, 4)) || undefined
+          : undefined,
+      };
+    }
+
+    if (input.provider === 'openlibrary' && input.kind === HubMediaKind.BOOK) {
+      const response = await clients.openLibrary.get<OpenLibraryWorkDetail>(
+        `/works/${encodeURIComponent(input.externalId)}.json`
+      );
+      const title = canonicalText(response.data.title, 500);
+      if (
+        response.data.key.toUpperCase() !==
+          `/works/${input.externalId}`.toUpperCase() ||
+        !title
+      ) {
+        throw new HubCatalogItemNotFoundError();
+      }
+      const coverId = response.data.covers?.find(
+        (cover) => Number.isInteger(cover) && cover > 0
+      );
+      return {
+        kind: input.kind,
+        provider: input.provider,
+        externalId: response.data.key.replace('/works/', '').toUpperCase(),
+        title,
+        subtitle: await resolveOpenLibraryAuthors(
+          response.data,
+          clients.openLibrary
+        ),
+        imageUrl: coverId
+          ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`
+          : undefined,
+      };
+    }
+
+    throw new HubCatalogItemNotFoundError();
+  } catch (error) {
+    if (
+      error instanceof HubCatalogItemNotFoundError ||
+      (axios.isAxiosError(error) && error.response?.status === 404)
+    ) {
+      throw new HubCatalogItemNotFoundError();
+    }
+    throw error;
+  }
 };
