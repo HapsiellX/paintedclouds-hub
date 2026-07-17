@@ -6086,6 +6086,59 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/TvResult'
+  /discover/tv/current:
+    get:
+      summary: Discover current streaming series and anime
+      description: Returns current flatrate streaming titles based on recent episode air dates, popularity, ratings, and the user's watch region.
+      tags:
+        - search
+      parameters:
+        - in: query
+          name: mode
+          required: true
+          schema:
+            type: string
+            enum:
+              - popular
+              - acclaimed
+              - anime
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+        - in: query
+          name: language
+          schema:
+            type: string
+            example: de
+      responses:
+        '200':
+          description: 'Current streaming results'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - page
+                  - totalPages
+                  - totalResults
+                  - results
+                properties:
+                  page:
+                    type: number
+                    example: 1
+                  totalPages:
+                    type: number
+                    example: 20
+                  totalResults:
+                    type: number
+                    example: 200
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TvResult'
   /discover/tv/language/{language}:
     get:
       summary: Discover TV shows by original language
