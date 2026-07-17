@@ -5,6 +5,8 @@ import { HubMediaKind, HubRequestState } from '@server/constants/hub';
 import { getRepository } from '@server/datasource';
 import { HubAuditEvent } from '@server/entity/HubAuditEvent';
 import { HubRequest } from '@server/entity/HubRequest';
+import { HubUserProfile } from '@server/entity/HubUserProfile';
+import { HubUserSignal } from '@server/entity/HubUserSignal';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import { createHubRateLimiter } from '@server/lib/hub/rateLimit';
@@ -76,6 +78,8 @@ before(() => {
 });
 
 beforeEach(async () => {
+  await getRepository(HubUserSignal).createQueryBuilder().delete().execute();
+  await getRepository(HubUserProfile).createQueryBuilder().delete().execute();
   await getRepository(HubAuditEvent).createQueryBuilder().delete().execute();
   await getRepository(HubRequest).createQueryBuilder().delete().execute();
 });
@@ -220,6 +224,10 @@ describe('Hub authorization and privacy', () => {
     assert.strictEqual(search.status, 400);
     const list = await agent.get('/hub/requests?take=251');
     assert.strictEqual(list.status, 400);
+    const artistSearch = await agent.get(
+      '/hub/personalization/music/artists?query=x'
+    );
+    assert.strictEqual(artistSearch.status, 400);
   });
 
   it('prevents non-admin request management actions', async () => {
@@ -311,6 +319,72 @@ describe('Hub authorization and privacy', () => {
         .state,
       HubRequestState.FAILED
     );
+  });
+
+  it('isolates profiles, feedback and the shared saved list per user', async () => {
+    const friend = await loginAs('friend@seerr.dev');
+    const admin = await loginAs('admin@seerr.dev');
+    const item = {
+      kind: HubMediaKind.BOOK,
+      provider: 'openlibrary',
+      externalId: 'OL900W',
+      title: 'Private saved book',
+      saved: true,
+      liked: true,
+    };
+    assert.strictEqual(
+      (await friend.put('/hub/personalization/items').send(item)).status,
+      200
+    );
+    await friend.put('/hub/personalization/profile').send({
+      preferredGenres: ['fantasy'],
+      musicGenres: ['metal', 'ambient'],
+      musicArtists: [
+        {
+          id: '123e4567-e89b-42d3-a456-426614174000',
+          name: 'Private Band',
+          type: 'Group',
+        },
+      ],
+    });
+
+    const friendSaved = await friend.get('/hub/saved');
+    const adminSaved = await admin.get('/hub/saved');
+    assert.strictEqual(friendSaved.body.results.length, 1);
+    assert.strictEqual(adminSaved.body.results.length, 0);
+    assert.deepStrictEqual(
+      (await friend.get('/hub/personalization/profile')).body.preferredGenres,
+      ['fantasy']
+    );
+    assert.deepStrictEqual(
+      (await admin.get('/hub/personalization/profile')).body.preferredGenres,
+      []
+    );
+    assert.deepStrictEqual(
+      (await friend.get('/hub/personalization/profile')).body.musicGenres,
+      ['metal', 'ambient']
+    );
+    assert.deepStrictEqual(
+      (await admin.get('/hub/personalization/profile')).body.musicArtists,
+      []
+    );
+  });
+
+  it('resets only the current user and disables personalization', async () => {
+    const friend = await loginAs('friend@seerr.dev');
+    await friend.put('/hub/personalization/items').send({
+      kind: HubMediaKind.BOOK,
+      provider: 'openlibrary',
+      externalId: 'OL901W',
+      title: 'Saved',
+      saved: true,
+    });
+    const reset = await friend.delete('/hub/personalization/data');
+    assert.strictEqual(reset.status, 200);
+    assert.strictEqual(reset.body.enabled, false);
+    assert.deepStrictEqual(reset.body.musicGenres, []);
+    assert.deepStrictEqual(reset.body.musicArtists, []);
+    assert.deepStrictEqual((await friend.get('/hub/saved')).body.results, []);
   });
 });
 

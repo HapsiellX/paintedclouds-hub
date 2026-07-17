@@ -12,6 +12,11 @@ music, e-book, and audiobook discovery and request workflows.
 > only a signed release image and a migration path explicitly listed in its
 > release notes.
 
+V0.5 current discovery is available as a public beta. See the
+[music-source, recency, streaming, and upgrade notes](docs/v0.5-current-discovery.md)
+and the underlying
+[personalization privacy model](docs/v0.4-personalization-beta.md).
+
 PaintedClouds Hub is an independent fork. It is not affiliated with, endorsed
 by, or supported by the Seerr project or its maintainers. Please report
 PaintedClouds Hub problems here, not to Seerr's support channels.

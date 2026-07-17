@@ -1,6 +1,12 @@
 import PageTitle from '@app/components/Common/PageTitle';
 import useLocale from '@app/hooks/useLocale';
-import { BookOpenIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
+import {
+  BookOpenIcon,
+  MusicalNoteIcon,
+  PlusIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
+import axios from 'axios';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -31,12 +37,23 @@ interface DiscoverResponse {
   errors: string[];
 }
 
+interface MusicArtist {
+  id: string;
+  name: string;
+  type?: string;
+}
+
+interface PersonalizationProfile {
+  musicGenres: string[];
+  musicArtists: MusicArtist[];
+}
+
 const sectionContentDe = {
   music: {
     title: 'Musik entdecken',
     eyebrow: 'Alben & Künstler',
     description:
-      'Stöbere durch ausgewählte Stilwelten oder suche gezielt nach Künstlern und Alben.',
+      'Wähle Genres, Künstler und Gruppen oder entdecke automatisch aktuelle Veröffentlichungen.',
     placeholder: 'Künstler oder Album suchen …',
     kinds: 'music_artist,music_album',
   },
@@ -55,7 +72,7 @@ const sectionContentEn = {
     title: 'Discover music',
     eyebrow: 'Albums & artists',
     description:
-      'Browse selected styles or search directly for artists and albums.',
+      'Choose genres, artists, and groups or automatically discover current releases.',
     placeholder: 'Search for an artist or album…',
     kinds: 'music_artist,music_album',
   },
@@ -76,10 +93,48 @@ const DiscoverPage = ({ section }: { section: MediaSection }) => {
     section
   ];
   const [query, setQuery] = useState('');
-  const { data, error, isLoading } = useSWR<DiscoverResponse>(
-    `/api/v1/hub/discover/${section}`,
-    { revalidateOnFocus: false, dedupingInterval: 15 * 60 * 1_000 }
+  const [genreInput, setGenreInput] = useState('');
+  const [artistQuery, setArtistQuery] = useState('');
+  const {
+    data,
+    error,
+    isLoading,
+    mutate: refreshShelves,
+  } = useSWR<DiscoverResponse>(`/api/v1/hub/discover/${section}`, {
+    revalidateOnFocus: false,
+    dedupingInterval: 15 * 60 * 1_000,
+  });
+  const { data: profile, mutate: refreshProfile } =
+    useSWR<PersonalizationProfile>(
+      section === 'music' ? '/api/v1/hub/personalization/profile' : null
+    );
+  const { data: artistOptions, isLoading: searchingArtists } = useSWR<{
+    results: MusicArtist[];
+  }>(
+    section === 'music' && artistQuery.trim().length >= 2
+      ? `/api/v1/hub/personalization/music/artists?query=${encodeURIComponent(
+          artistQuery.trim()
+        )}`
+      : null,
+    { keepPreviousData: false }
   );
+
+  const updateMusicPreferences = async (
+    updates: Partial<PersonalizationProfile>
+  ) => {
+    await axios.put('/api/v1/hub/personalization/profile', updates);
+    await refreshProfile();
+    await refreshShelves();
+  };
+
+  const addGenre = async () => {
+    const genre = genreInput.trim();
+    if (!genre || !profile) return;
+    await updateMusicPreferences({
+      musicGenres: [...new Set([...profile.musicGenres, genre])],
+    });
+    setGenreInput('');
+  };
 
   const openSearch = () => {
     const normalized = query.trim();
@@ -137,6 +192,165 @@ const DiscoverPage = ({ section }: { section: MediaSection }) => {
           </form>
         </div>
       </header>
+
+      {section === 'music' && profile && (
+        <section className="rounded-2xl border border-fuchsia-500/20 bg-gray-800/70 p-5 sm:p-6">
+          <div className="max-w-3xl">
+            <h2 className="text-xl font-bold text-white">
+              {tr('Deine Musikquellen', 'Your music sources')}
+            </h2>
+            <p className="mt-1 text-sm text-gray-400">
+              {tr(
+                'Wähle Genres und konkrete Künstler oder Gruppen. Ohne Auswahl zeigen wir automatisch die neuesten Alben, EPs und Singles.',
+                'Choose genres and specific artists or groups. Without a selection, we automatically show the latest albums, EPs, and singles.'
+              )}
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-6 lg:grid-cols-2">
+            <div>
+              <label
+                htmlFor="music-genre"
+                className="text-sm font-semibold text-gray-200"
+              >
+                Genres
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="music-genre"
+                  value={genreInput}
+                  onChange={(event) => setGenreInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void addGenre();
+                    }
+                  }}
+                  placeholder={tr(
+                    'z. B. Metal, Jazz, K-Pop',
+                    'e.g. metal, jazz, K-pop'
+                  )}
+                  className="min-w-0 flex-1 rounded-lg border-gray-600 bg-gray-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addGenre()}
+                  disabled={!genreInput.trim()}
+                  className="rounded-lg bg-fuchsia-600 p-2.5 text-white disabled:opacity-40"
+                  aria-label={tr('Genre hinzufügen', 'Add genre')}
+                >
+                  <PlusIcon className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {profile.musicGenres.map((genre) => (
+                  <span
+                    key={genre}
+                    className="flex items-center gap-1 rounded-full bg-fuchsia-500/20 px-3 py-1 text-sm text-fuchsia-100"
+                  >
+                    {genre}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void updateMusicPreferences({
+                          musicGenres: profile.musicGenres.filter(
+                            (item) => item !== genre
+                          ),
+                        })
+                      }
+                      aria-label={tr(`${genre} entfernen`, `Remove ${genre}`)}
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative">
+              <label
+                htmlFor="music-artist"
+                className="text-sm font-semibold text-gray-200"
+              >
+                {tr('Künstler und Gruppen', 'Artists and groups')}
+              </label>
+              <input
+                id="music-artist"
+                value={artistQuery}
+                onChange={(event) => setArtistQuery(event.target.value)}
+                placeholder={tr(
+                  'Künstler oder Band suchen …',
+                  'Search for an artist or band…'
+                )}
+                className="mt-2 w-full rounded-lg border-gray-600 bg-gray-900"
+              />
+              {artistQuery.trim().length >= 2 && (
+                <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-600 bg-gray-900 shadow-2xl">
+                  {searchingArtists ? (
+                    <p className="p-3 text-sm text-gray-400">
+                      {tr('Suche …', 'Searching…')}
+                    </p>
+                  ) : artistOptions?.results.length ? (
+                    artistOptions.results.map((artist) => (
+                      <button
+                        key={artist.id}
+                        type="button"
+                        className="flex w-full items-center justify-between border-b border-gray-700 px-3 py-2 text-left last:border-0 hover:bg-gray-800"
+                        onClick={() => {
+                          void updateMusicPreferences({
+                            musicArtists: [
+                              ...profile.musicArtists.filter(
+                                (item) => item.id !== artist.id
+                              ),
+                              artist,
+                            ],
+                          });
+                          setArtistQuery('');
+                        }}
+                      >
+                        <span className="text-white">{artist.name}</span>
+                        <span className="text-xs text-gray-400">
+                          {artist.type ?? tr('Künstler', 'Artist')}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="p-3 text-sm text-gray-400">
+                      {tr('Keine Künstler gefunden.', 'No artists found.')}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {profile.musicArtists.map((artist) => (
+                  <span
+                    key={artist.id}
+                    className="flex items-center gap-1 rounded-full bg-indigo-500/20 px-3 py-1 text-sm text-indigo-100"
+                  >
+                    {artist.name}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void updateMusicPreferences({
+                          musicArtists: profile.musicArtists.filter(
+                            (item) => item.id !== artist.id
+                          ),
+                        })
+                      }
+                      aria-label={tr(
+                        `${artist.name} entfernen`,
+                        `Remove ${artist.name}`
+                      )}
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {error ? (
         <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-5 text-red-200">
