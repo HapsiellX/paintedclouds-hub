@@ -6,6 +6,7 @@ import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import {
   BookOpenIcon,
+  BookmarkIcon,
   ClockIcon,
   CogIcon,
   ExclamationTriangleIcon,
@@ -27,6 +28,8 @@ import { useIntl } from 'react-intl';
 export const menuMessages = defineMessages('components.Layout.Sidebar', {
   dashboard: 'Discover',
   hub: 'Hub',
+  foryou: 'For you',
+  saved: 'Saved',
   browsemovies: 'Movies',
   browsetv: 'Series & Anime',
   browsemusic: 'Music',
@@ -59,6 +62,18 @@ interface SidebarLinkProps {
 }
 
 const SidebarLinks: SidebarLinkProps[] = [
+  {
+    href: '/for-you',
+    messagesKey: 'foryou',
+    svgIcon: <SparklesIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/for-you/,
+  },
+  {
+    href: '/saved',
+    messagesKey: 'saved',
+    svgIcon: <BookmarkIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/saved/,
+  },
   {
     href: '/hub',
     messagesKey: 'hub',

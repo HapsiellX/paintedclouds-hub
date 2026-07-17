@@ -5,6 +5,11 @@ manager for self-hosted libraries. It extends the movie and television
 workflows inherited from [Seerr](https://github.com/seerr-team/seerr) with
 music, e-book, and audiobook discovery and request workflows.
 
+V0.5 current discovery is available as a public beta. See the
+[music-source, recency, streaming, and upgrade notes](docs/v0.5-current-discovery.md)
+and the underlying
+[personalization privacy model](docs/v0.4-personalization-beta.md).
+
 > [!CAUTION]
 > PaintedClouds Hub is alpha software. Back up your configuration and database
 > before installing or upgrading. Interfaces, configuration, and database

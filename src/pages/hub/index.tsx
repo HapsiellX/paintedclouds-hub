@@ -48,6 +48,16 @@ interface Overview {
   requests: HubRequest[];
 }
 
+interface ProviderStatus {
+  providers: {
+    provider: string;
+    healthy: boolean;
+    lastSuccess: string | null;
+    circuitOpenUntil: string | null;
+    errorHistory: { at: string; code: string }[];
+  }[];
+}
+
 const kindLabels: Record<HubKind, string> = {
   movie: 'Film',
   tv: 'Serie',
@@ -102,6 +112,10 @@ const HubPage: NextPage = () => {
   }>(searchUrl);
   const { data: overview, mutate: refreshOverview } = useSWR<Overview>(
     '/api/v1/hub/overview',
+    { refreshInterval: 30_000 }
+  );
+  const { data: providerStatus } = useSWR<ProviderStatus>(
+    admin ? '/api/v1/hub/providers/status' : null,
     { refreshInterval: 30_000 }
   );
 
@@ -361,6 +375,28 @@ const HubPage: NextPage = () => {
                 : `${overview.storage.usedPercent} % belegt`}
             </p>
           </div>
+          {providerStatus?.providers.map((provider) => (
+            <div
+              key={provider.provider}
+              className="rounded-xl border border-gray-700 bg-gray-800/60 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold capitalize text-white">
+                  {provider.provider}
+                </span>
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${provider.healthy ? 'bg-emerald-400' : 'bg-red-400'}`}
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Letzter Erfolg:{' '}
+                {provider.lastSuccess
+                  ? new Date(provider.lastSuccess).toLocaleString('de-DE')
+                  : 'noch keiner'}
+                {' · '}Fehlerhistorie: {provider.errorHistory.length}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 

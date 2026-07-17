@@ -8266,9 +8266,85 @@ paths:
       tags: [hub]
       responses:
         '200': { description: Hub overview }
+  /hub/personalization/profile:
+    get:
+      summary: Get the current user's local personalization preferences
+      tags: [hub]
+      responses:
+        '200': { description: Personalization profile }
+    put:
+      summary: Idempotently update the current user's personalization preferences
+      tags: [hub]
+      responses:
+        '200': { description: Updated personalization profile }
+  /hub/personalization/items:
+    put:
+      summary: Idempotently set like, hidden and saved state for one catalog item
+      description: Feedback never creates a media request or starts a download.
+      tags: [hub]
+      responses:
+        '200': { description: Updated item feedback }
+  /hub/personalization/music/artists:
+    get:
+      summary: Search canonical MusicBrainz artists and groups for the current user's music sources
+      tags: [hub]
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 100 }
+      responses:
+        '200': { description: MusicBrainz artist IDs, names, and types }
+  /hub/personalization/data:
+    delete:
+      summary: Erase the current user's Hub signals and preferences
+      tags: [hub]
+      responses:
+        '200': { description: Personalization was erased and disabled }
+  /hub/recommendations:
+    get:
+      summary: Get explainable, user-isolated media recommendations
+      tags: [hub]
+      parameters:
+        - in: query
+          name: mediaType
+          schema:
+            type: string
+            enum: [all, movie, tv, music_artist, music_album, book]
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+      responses:
+        '200':
+          {
+            description: Diversified shelves and stable recommendation reason codes,
+          }
+  /hub/saved:
+    get:
+      summary: Get the current user's cross-media saved list
+      tags: [hub]
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+      responses:
+        '200': { description: Cursor-paginated saved items }
+  /hub/providers/status:
+    get:
+      summary: Get aggregate metadata-provider health (administrator only)
+      tags: [hub]
+      responses:
+        '200':
+          { description: Last success, circuit state and bounded error history }
   /hub/discover/{section}:
     get:
-      summary: Get curated PaintedClouds music or book shelves
+      summary: Get personalized current-music or curated book shelves
       tags: [hub]
       parameters:
         - in: path

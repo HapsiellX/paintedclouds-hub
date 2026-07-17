@@ -17,7 +17,19 @@ export interface HubCatalogItem {
   description?: string;
   imageUrl?: string;
   year?: number;
+  releaseDate?: string;
   languages?: string[];
+  genres?: string[];
+  formats?: ('ebook' | 'audiobook')[];
+  popularity?: number;
+  freshness?: number;
+  available?: boolean;
+  requested?: boolean;
+  downloading?: boolean;
+  saved?: boolean;
+  liked?: boolean;
+  hidden?: boolean;
+  recommendationReasons?: { code: string; context?: string }[];
 }
 
 export interface HubCatalogShelf {
@@ -31,9 +43,16 @@ interface MusicBrainzArtistResponse {
   artists?: {
     id: string;
     name: string;
+    type?: string;
     disambiguation?: string;
     country?: string;
   }[];
+}
+
+export interface HubMusicArtistPreference {
+  id: string;
+  name: string;
+  type?: string;
 }
 
 interface MusicBrainzReleaseResponse {
@@ -246,25 +265,42 @@ const mapReleaseGroups = (
     year: album['first-release-date']
       ? Number(album['first-release-date'].slice(0, 4))
       : undefined,
+    releaseDate: album['first-release-date'],
+    freshness: freshnessFromDate(album['first-release-date']),
   }));
+
+const freshnessFromDate = (value?: string) => {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return 0;
+  const ageDays = Math.max(0, Date.now() - timestamp) / 86_400_000;
+  return Math.max(0, 1 - ageDays / 180);
+};
 
 const discoverMusicShelf = async ({
   id,
   title,
   description,
   query,
+  genreTags,
 }: Omit<HubCatalogShelf, 'items'> & {
   query: string;
+  genreTags?: string[];
 }): Promise<HubCatalogShelf> => {
   const response = await musicBrainz.get<MusicBrainzReleaseResponse>(
     '/release-group',
-    { params: { query, fmt: 'json', limit: 18 } }
+    { params: { query, fmt: 'json', limit: 100 } }
   );
   return {
     id,
     title,
     description,
-    items: mapReleaseGroups(response.data['release-groups'] ?? []),
+    items: mapReleaseGroups(response.data['release-groups'] ?? [])
+      .sort((left, right) =>
+        (right.releaseDate ?? '').localeCompare(left.releaseDate ?? '')
+      )
+      .slice(0, 18)
+      .map((item) => ({ ...item, genres: genreTags ?? [], popularity: 75 })),
   };
 };
 
@@ -306,7 +342,12 @@ const discoverBookShelf = async ({
     id,
     title,
     description,
-    items: mapOpenLibraryWorks(response.data.works ?? []),
+    items: mapOpenLibraryWorks(response.data.works ?? []).map((item) => ({
+      ...item,
+      genres: id === 'trending' ? [] : [id],
+      formats: ['ebook', 'audiobook'],
+      popularity: id === 'trending' ? 100 : 50,
+    })),
   };
 };
 
@@ -324,27 +365,77 @@ const settledShelves = async (
   };
 };
 
-const discoverMusicShelves = () =>
-  settledShelves([
-    discoverMusicShelf({
-      id: 'metal-rock',
-      title: 'Metal & Rock',
-      description: 'Druckvolle Alben und moderne Gitarrenmusik',
-      query: 'tag:metal AND primarytype:album',
-    }),
-    discoverMusicShelf({
-      id: 'soundtracks',
-      title: 'Soundtracks & Scores',
-      description: 'Musik aus Film, Serie, Anime und Games',
-      query: 'secondarytype:soundtrack',
-    }),
-    discoverMusicShelf({
-      id: 'electronic-ambient',
-      title: 'Electronic & Ambient',
-      description: 'Elektronische Klangwelten zum Entdecken',
-      query: '(tag:electronic OR tag:ambient) AND primarytype:album',
-    }),
-  ]);
+const musicReleaseDateRange = (now = new Date()) => {
+  const end = new Date(now);
+  const start = new Date(end);
+  start.setUTCMonth(start.getUTCMonth() - 6);
+  return `${start.toISOString().slice(0, 10)} TO ${end
+    .toISOString()
+    .slice(0, 10)}`;
+};
+
+const escapeLucenePhrase = (value: string) =>
+  value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+export const buildHubRecentMusicQuery = (
+  filter?: { genre?: string; artistId?: string },
+  now = new Date()
+) => {
+  const clauses = [
+    `firstreleasedate:[${musicReleaseDateRange(now)}]`,
+    'primarytype:(album OR single OR ep)',
+  ];
+  if (filter?.genre) clauses.push(`tag:"${escapeLucenePhrase(filter.genre)}"`);
+  if (filter?.artistId) clauses.push(`arid:${filter.artistId}`);
+  return clauses.join(' AND ');
+};
+
+const slug = (value: string) =>
+  value
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+    .slice(0, 48);
+
+const discoverMusicShelves = ({
+  genres,
+  artists,
+}: {
+  genres: string[];
+  artists: HubMusicArtistPreference[];
+}) => {
+  const shelves: Promise<HubCatalogShelf>[] = [
+    ...genres.map((genre) =>
+      discoverMusicShelf({
+        id: `genre-${slug(genre)}`,
+        title: `Neu in ${genre}`,
+        description: `Aktuelle Alben, EPs und Singles aus ${genre}`,
+        query: buildHubRecentMusicQuery({ genre }),
+        genreTags: [genre],
+      })
+    ),
+    ...artists.map((artist) =>
+      discoverMusicShelf({
+        id: `artist-${artist.id}`,
+        title: `Neu von ${artist.name}`,
+        description: `Aktuelle Veröffentlichungen von ${artist.name}`,
+        query: buildHubRecentMusicQuery({ artistId: artist.id }),
+      })
+    ),
+  ];
+  if (!shelves.length) {
+    shelves.push(
+      discoverMusicShelf({
+        id: 'latest-music',
+        title: 'Aktuelle Musik',
+        description: 'Neue und derzeit relevante Alben, EPs und Singles',
+        query: buildHubRecentMusicQuery(),
+      })
+    );
+  }
+  return settledShelves(shelves);
+};
 
 const discoverBookShelves = () =>
   settledShelves([
@@ -376,12 +467,12 @@ const discoverBookShelves = () =>
 
 type DiscoveryResult = Awaited<ReturnType<typeof settledShelves>>;
 const discoveryCache = new Map<
-  'music' | 'books',
+  string,
   { expiresAt: number; value: DiscoveryResult }
 >();
 
 const cachedDiscovery = async (
-  section: 'music' | 'books',
+  section: string,
   load: () => Promise<DiscoveryResult>
 ): Promise<DiscoveryResult> => {
   const cached = discoveryCache.get(section);
@@ -394,11 +485,318 @@ const cachedDiscovery = async (
   return value;
 };
 
-export const discoverHubMusic = () =>
-  cachedDiscovery('music', discoverMusicShelves);
+export const discoverHubMusic = ({
+  genres = [],
+  artists = [],
+}: {
+  genres?: string[];
+  artists?: HubMusicArtistPreference[];
+} = {}) => {
+  const normalizedGenres = [...new Set(genres.map((genre) => genre.trim()))]
+    .filter(Boolean)
+    .sort();
+  const normalizedArtists = [...artists]
+    .filter((artist) => /^[0-9a-f-]{36}$/i.test(artist.id))
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const key = `music:${normalizedGenres.join('|')}:${normalizedArtists
+    .map((artist) => artist.id)
+    .join('|')}`;
+  return cachedDiscovery(key, () =>
+    discoverMusicShelves({
+      genres: normalizedGenres,
+      artists: normalizedArtists,
+    })
+  );
+};
 
 export const discoverHubBooks = () =>
   cachedDiscovery('books', discoverBookShelves);
+
+export const searchHubMusicArtists = async (
+  query: string
+): Promise<HubMusicArtistPreference[]> => {
+  const response = await musicBrainz.get<MusicBrainzArtistResponse>('/artist', {
+    params: { query, fmt: 'json', limit: 12 },
+  });
+  return (response.data.artists ?? []).map((artist) => ({
+    id: artist.id,
+    name: artist.name,
+    type: artist.type,
+  }));
+};
+
+const majorStreamingProviderNames = new Set([
+  'netflix',
+  'amazon prime video',
+  'disney plus',
+  'apple tv plus',
+  'paramount plus',
+  'wow',
+  'max',
+]);
+
+export const selectMajorStreamingProviderIds = (
+  providers: { provider_id: number; provider_name: string }[]
+) =>
+  providers
+    .filter((provider) =>
+      majorStreamingProviderNames.has(provider.provider_name.toLowerCase())
+    )
+    .map((provider) => provider.provider_id);
+
+interface ProviderRuntimeState {
+  consecutiveFailures: number;
+  circuitOpenUntil?: number;
+  lastSuccess?: number;
+  errors: { at: number; code: 'PROVIDER_UNAVAILABLE' }[];
+}
+
+const providerRuntime = new Map<
+  'tmdb' | 'musicbrainz' | 'openlibrary',
+  ProviderRuntimeState
+>();
+
+const providerCall = async <T>(
+  provider: 'tmdb' | 'musicbrainz' | 'openlibrary',
+  load: () => Promise<T>
+): Promise<T> => {
+  const state = providerRuntime.get(provider) ?? {
+    consecutiveFailures: 0,
+    errors: [],
+  };
+  providerRuntime.set(provider, state);
+  if (state.circuitOpenUntil && state.circuitOpenUntil > Date.now())
+    throw new Error('PROVIDER_CIRCUIT_OPEN');
+  try {
+    const value = await load();
+    state.consecutiveFailures = 0;
+    state.circuitOpenUntil = undefined;
+    state.lastSuccess = Date.now();
+    return value;
+  } catch {
+    state.consecutiveFailures += 1;
+    state.errors = [
+      { at: Date.now(), code: 'PROVIDER_UNAVAILABLE' as const },
+      ...state.errors,
+    ].slice(0, 20);
+    if (state.consecutiveFailures >= 3)
+      state.circuitOpenUntil = Date.now() + 5 * 60 * 1_000;
+    throw new Error('PROVIDER_UNAVAILABLE');
+  }
+};
+
+export const getHubProviderHealth = () =>
+  (['tmdb', 'musicbrainz', 'openlibrary'] as const).map((provider) => {
+    const state = providerRuntime.get(provider);
+    return {
+      provider,
+      healthy: !state?.circuitOpenUntil || state.circuitOpenUntil <= Date.now(),
+      lastSuccess: state?.lastSuccess ? new Date(state.lastSuccess) : null,
+      circuitOpenUntil: state?.circuitOpenUntil
+        ? new Date(state.circuitOpenUntil)
+        : null,
+      errorHistory:
+        state?.errors.map((error) => ({
+          at: new Date(error.at),
+          code: error.code,
+        })) ?? [],
+    };
+  });
+
+const mapTrendingMovie = (item: TmdbMovieResult): HubCatalogItem => ({
+  kind: HubMediaKind.MOVIE,
+  provider: 'tmdb',
+  externalId: String(item.id),
+  title: item.title,
+  description: item.overview,
+  imageUrl: item.poster_path
+    ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+    : undefined,
+  year: item.release_date
+    ? Number(item.release_date.slice(0, 4)) || undefined
+    : undefined,
+  releaseDate: item.release_date,
+  freshness: freshnessFromDate(item.release_date),
+  languages: item.original_language ? [item.original_language] : undefined,
+  genres: (item.genre_ids ?? []).map(String),
+  popularity: item.popularity,
+});
+
+const mapTrendingTv = (item: TmdbTvResult): HubCatalogItem => ({
+  kind: HubMediaKind.TV,
+  provider: 'tmdb',
+  externalId: String(item.id),
+  title: item.name,
+  description: item.overview,
+  imageUrl: item.poster_path
+    ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+    : undefined,
+  year: item.first_air_date
+    ? Number(item.first_air_date.slice(0, 4)) || undefined
+    : undefined,
+  releaseDate: item.first_air_date,
+  freshness: freshnessFromDate(item.first_air_date),
+  languages: item.original_language ? [item.original_language] : undefined,
+  genres: (item.genre_ids ?? []).map(String),
+  popularity: item.popularity,
+});
+
+export const loadHubRecommendationCandidates = async (
+  language: string,
+  librarySeeds: {
+    kind: HubMediaKind.MOVIE | HubMediaKind.TV;
+    id: number;
+  }[] = [],
+  musicPreferences: {
+    genres?: string[];
+    artists?: HubMusicArtistPreference[];
+  } = {}
+): Promise<{ items: HubCatalogItem[]; errors: string[] }> => {
+  const cacheKey = `${language.toLowerCase()}:${librarySeeds
+    .map((seed) => `${seed.kind}:${seed.id}`)
+    .sort()
+    .join(',')}:${[...(musicPreferences.genres ?? [])].sort().join(',')}:${[
+    ...(musicPreferences.artists ?? []),
+  ]
+    .map((artist) => artist.id)
+    .sort()
+    .join(',')}`;
+  const cachedCandidates = recommendationCandidateCache.get(cacheKey);
+  if (cachedCandidates && cachedCandidates.expiresAt > Date.now())
+    return cachedCandidates.value;
+  const tmdb = new TheMovieDb();
+  const today = new Date();
+  const recentDate = new Date(today);
+  recentDate.setUTCDate(recentDate.getUTCDate() - 120);
+  const dateRange = {
+    from: recentDate.toISOString().slice(0, 10),
+    to: today.toISOString().slice(0, 10),
+  };
+  const loadCurrentStreamingTv = async () => {
+    const providers = await tmdb.getTvWatchProviders({
+      language,
+      watchRegion: 'DE',
+    });
+    const providerIds = selectMajorStreamingProviderIds(providers).join('|');
+    if (!providerIds)
+      return { page: 1, total_pages: 0, total_results: 0, results: [] };
+    return tmdb.getDiscoverTv({
+      language,
+      firstAirDateGte: dateRange.from,
+      firstAirDateLte: dateRange.to,
+      sortBy: 'popularity.desc',
+      voteAverageGte: '7',
+      voteCountGte: '50',
+      watchProviders: providerIds,
+      watchMonetizationTypes: 'flatrate',
+      watchRegion: 'DE',
+      originalLanguage: 'all',
+    });
+  };
+  const sources = await Promise.allSettled([
+    providerCall('tmdb', () =>
+      tmdb.getDiscoverMovies({
+        language,
+        primaryReleaseDateGte: dateRange.from,
+        primaryReleaseDateLte: dateRange.to,
+        sortBy: 'popularity.desc',
+        voteCountGte: '50',
+        originalLanguage: 'all',
+      })
+    ),
+    providerCall('tmdb', loadCurrentStreamingTv),
+    providerCall('musicbrainz', () =>
+      discoverHubMusic({
+        genres: musicPreferences.genres,
+        artists: musicPreferences.artists,
+      })
+    ),
+    providerCall('openlibrary', discoverHubBooks),
+  ]);
+  const items: HubCatalogItem[] = [];
+  if (sources[0].status === 'fulfilled')
+    items.push(...sources[0].value.results.map(mapTrendingMovie));
+  if (sources[1].status === 'fulfilled')
+    items.push(...sources[1].value.results.map(mapTrendingTv));
+  if (sources[2].status === 'fulfilled')
+    items.push(...sources[2].value.shelves.flatMap((shelf) => shelf.items));
+  if (sources[3].status === 'fulfilled')
+    items.push(...sources[3].value.shelves.flatMap((shelf) => shelf.items));
+  const movieSeed = librarySeeds.find(
+    (seed) => seed.kind === HubMediaKind.MOVIE
+  );
+  const tvSeed = librarySeeds.find((seed) => seed.kind === HubMediaKind.TV);
+  const related = await Promise.allSettled([
+    movieSeed
+      ? providerCall('tmdb', () =>
+          tmdb.getMovieRecommendations({
+            movieId: movieSeed.id,
+            language,
+          })
+        )
+      : Promise.resolve(undefined),
+    movieSeed
+      ? providerCall('tmdb', () =>
+          tmdb.getMovieSimilar({ movieId: movieSeed.id, language })
+        )
+      : Promise.resolve(undefined),
+    tvSeed
+      ? providerCall('tmdb', () =>
+          tmdb.getTvRecommendations({ tvId: tvSeed.id, language })
+        )
+      : Promise.resolve(undefined),
+    tvSeed
+      ? providerCall('tmdb', () =>
+          tmdb.getTvSimilar({ tvId: tvSeed.id, language })
+        )
+      : Promise.resolve(undefined),
+  ]);
+  for (const result of [related[0], related[1]]) {
+    if (result.status === 'fulfilled' && result.value)
+      items.push(
+        ...result.value.results
+          .filter(
+            (item) => !item.release_date || item.release_date >= dateRange.from
+          )
+          .map(mapTrendingMovie)
+      );
+  }
+  for (const result of [related[2], related[3]]) {
+    if (result.status === 'fulfilled' && result.value)
+      items.push(
+        ...result.value.results
+          .filter(
+            (item) =>
+              !item.first_air_date || item.first_air_date >= dateRange.from
+          )
+          .map(mapTrendingTv)
+      );
+  }
+  const value = {
+    items,
+    errors: [...sources, ...related].flatMap((source) =>
+      source.status === 'rejected' ? ['PROVIDER_UNAVAILABLE'] : []
+    ),
+  };
+  if (items.length) {
+    recommendationCandidateCache.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + 60 * 60 * 1_000,
+    });
+    return value;
+  }
+  return cachedCandidates
+    ? { ...cachedCandidates.value, errors: ['CACHE_FALLBACK'] }
+    : value;
+};
+
+const recommendationCandidateCache = new Map<
+  string,
+  {
+    value: { items: HubCatalogItem[]; errors: string[] };
+    expiresAt: number;
+  }
+>();
 
 export const searchHubCatalog = async ({
   query,

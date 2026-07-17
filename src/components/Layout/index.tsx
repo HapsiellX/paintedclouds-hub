@@ -24,6 +24,10 @@ const Layout = ({ children }: LayoutProps) => {
   const router = useRouter();
   const { currentSettings } = useSettings();
   const { setLocale } = useLocale();
+  const usesPageSearch =
+    router.pathname === '/hub' ||
+    router.pathname === '/discover/music' ||
+    router.pathname === '/discover/books';
   const { data: requestResponse, mutate: revalidateRequestsCount } = useSWR(
     '/api/v1/request/count',
     {
@@ -116,7 +120,7 @@ const Layout = ({ children }: LayoutProps) => {
             >
               <ArrowLeftIcon className="w-7" />
             </button>
-            <SearchInput />
+            {usesPageSearch ? <div className="flex-1" /> : <SearchInput />}
             <div className="flex items-center">
               <UserDropdown />
             </div>

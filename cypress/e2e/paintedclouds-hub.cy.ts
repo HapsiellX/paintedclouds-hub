@@ -45,9 +45,11 @@ describe('PaintedClouds Hub', () => {
     cy.get('[data-testid=music-discover-shelves]').should('be.visible');
     cy.get('[data-testid=music-discover-card]').should(
       'have.length.at.least',
-      12
+      1
     );
-    cy.contains('Metal & Rock').should('be.visible');
+    cy.get('#search_field').should('not.exist');
+    cy.get('[data-testid=music-discover-search]').should('be.visible');
+    cy.contains('Deine Musikquellen').should('be.visible');
 
     cy.visit('/discover/books');
     cy.get('[data-testid=books-discover-shelves]').should('be.visible');
@@ -56,5 +58,48 @@ describe('PaintedClouds Hub', () => {
       12
     );
     cy.contains('Gerade beliebt').should('be.visible');
+  });
+
+  it('supports the personalized feed, feedback, saved list and reset', () => {
+    cy.intercept('GET', '/api/v1/hub/personalization/profile', {
+      enabled: true,
+      preferredMediaKinds: [],
+      preferredGenres: ['fantasy'],
+      preferredLanguages: ['de'],
+    });
+    cy.intercept('GET', '/api/v1/hub/recommendations*', {
+      enabled: true,
+      errors: [],
+      shelves: [
+        {
+          id: 'mixed',
+          reasonCode: 'MIXED_FOR_YOU',
+          items: [
+            {
+              kind: 'book',
+              provider: 'openlibrary',
+              externalId: 'OL123W',
+              title: 'Empfohlenes Buch',
+              genres: ['fantasy'],
+              recommendationReasons: [{ code: 'PREFERRED_GENRE' }],
+            },
+          ],
+        },
+      ],
+    });
+    cy.intercept('PUT', '/api/v1/hub/personalization/items', {
+      liked: true,
+      hidden: false,
+      saved: true,
+    }).as('feedback');
+    cy.visit('/for-you');
+    cy.get('[data-testid=for-you-feed]').should('be.visible');
+    cy.contains('In einem deiner Lieblingsgenres').should('be.visible');
+    cy.get('[data-testid=recommendation-like]').click();
+    cy.wait('@feedback').its('request.body.liked').should('eq', true);
+    cy.get('[data-testid=recommendation-save]').click();
+    cy.wait('@feedback').its('request.body.saved').should('eq', true);
+    cy.get('[data-testid=recommendation-hide]').click();
+    cy.wait('@feedback').its('request.body.hidden').should('eq', true);
   });
 });
