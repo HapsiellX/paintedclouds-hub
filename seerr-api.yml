@@ -8362,7 +8362,7 @@ paths:
           required: true
           schema: { type: string, minLength: 2, maxLength: 100 }
       responses:
-        '200': { description: MusicBrainz artist IDs, names, and types }
+        '200': { description: 'MusicBrainz artist IDs, names, and types' }
   /hub/personalization/data:
     delete:
       summary: Erase the current user's Hub signals and preferences
@@ -8409,7 +8409,9 @@ paths:
       tags: [hub]
       responses:
         '200':
-          { description: Last success, circuit state and bounded error history }
+          {
+            description: 'Last success, circuit state and bounded error history',
+          }
   /hub/discover/{section}:
     get:
       summary: Get personalized current-music or curated book shelves
