@@ -1,12 +1,23 @@
 import assert from 'node:assert/strict';
 import { before, beforeEach, describe, it } from 'node:test';
 
-import { HubMediaKind, HubRequestState } from '@server/constants/hub';
+import {
+  HubMediaKind,
+  HubRequestFormat,
+  HubRequestState,
+} from '@server/constants/hub';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import { HubAuditEvent } from '@server/entity/HubAuditEvent';
 import { HubRequest } from '@server/entity/HubRequest';
 import { HubUserProfile } from '@server/entity/HubUserProfile';
 import { HubUserSignal } from '@server/entity/HubUserSignal';
+import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import { createHubRateLimiter } from '@server/lib/hub/rateLimit';
@@ -78,6 +89,8 @@ before(() => {
 });
 
 beforeEach(async () => {
+  await getRepository(MediaRequest).createQueryBuilder().delete().execute();
+  await getRepository(Media).createQueryBuilder().delete().execute();
   await getRepository(HubUserSignal).createQueryBuilder().delete().execute();
   await getRepository(HubUserProfile).createQueryBuilder().delete().execute();
   await getRepository(HubAuditEvent).createQueryBuilder().delete().execute();
@@ -98,7 +111,11 @@ const loginAs = async (email: string) => {
 const seedHubRequest = async (
   email: string,
   externalId: string,
-  errorMessage: string | null = null
+  errorMessage: string | null = null,
+  options: {
+    kind?: HubMediaKind;
+    formats?: HubRequestFormat[];
+  } = {}
 ) => {
   const user = await getRepository(User).findOneOrFail({ where: { email } });
   const userSettings =
@@ -114,15 +131,46 @@ const seedHubRequest = async (
 
   return getRepository(HubRequest).save(
     new HubRequest({
-      kind: HubMediaKind.BOOK,
-      provider: 'openlibrary',
+      kind: options.kind ?? HubMediaKind.BOOK,
+      provider:
+        options.kind && options.kind !== HubMediaKind.BOOK
+          ? 'musicbrainz'
+          : 'openlibrary',
       externalId,
       title: `Book ${externalId}`,
+      formats: options.formats,
       state: errorMessage ? HubRequestState.FAILED : HubRequestState.PENDING,
       points: 1,
       requestedBy: user,
       idempotencyKey: `private-key-${externalId}`,
       errorMessage,
+    })
+  );
+};
+
+const seedVideoRequest = async (
+  email: string,
+  type: MediaType,
+  tmdbId: number
+) => {
+  const requestedBy = await getRepository(User).findOneOrFail({
+    where: { email },
+  });
+  const media = await getRepository(Media).save(
+    new Media({
+      mediaType: type,
+      tmdbId,
+      status: MediaStatus.PENDING,
+      status4k: MediaStatus.UNKNOWN,
+    })
+  );
+  return getRepository(MediaRequest).save(
+    new MediaRequest({
+      type,
+      status: MediaRequestStatus.PENDING,
+      media,
+      requestedBy,
+      is4k: false,
     })
   );
 };
@@ -270,6 +318,50 @@ describe('Hub authorization and privacy', () => {
     );
     assert.strictEqual((await agent.get('/hub/reconciliation')).status, 403);
     assert.strictEqual((await agent.post('/hub/reconciliation')).status, 403);
+  });
+
+  it('merges every request category and filters book formats', async () => {
+    await seedVideoRequest('friend@seerr.dev', MediaType.MOVIE, 101);
+    await seedVideoRequest('friend@seerr.dev', MediaType.TV, 202);
+    await seedHubRequest('friend@seerr.dev', 'artist-id', null, {
+      kind: HubMediaKind.MUSIC_ARTIST,
+    });
+    await seedHubRequest('friend@seerr.dev', 'album-id', null, {
+      kind: HubMediaKind.MUSIC_ALBUM,
+    });
+    await seedHubRequest('friend@seerr.dev', 'OL910W', null, {
+      formats: [HubRequestFormat.EBOOK],
+    });
+    await seedHubRequest('friend@seerr.dev', 'OL911W', null, {
+      formats: [HubRequestFormat.AUDIOBOOK],
+    });
+    const agent = await loginAs('friend@seerr.dev');
+
+    const activity = await agent.get('/hub/activity?take=20');
+    assert.strictEqual(activity.status, 200);
+    assert.deepStrictEqual(
+      new Set(
+        activity.body.results.map((item: { kind: HubMediaKind }) => item.kind)
+      ),
+      new Set(Object.values(HubMediaKind))
+    );
+    assert.ok(
+      activity.body.results.some(
+        (item: { source: string; externalId: string }) =>
+          item.source === 'seerr' && item.externalId === '101'
+      )
+    );
+
+    const audiobooks = await agent.get(
+      '/hub/activity?kinds=book&formats=audiobook&take=20'
+    );
+    assert.strictEqual(audiobooks.status, 200);
+    assert.deepStrictEqual(
+      audiobooks.body.results.map(
+        (item: { formats: HubRequestFormat[] }) => item.formats
+      ),
+      [[HubRequestFormat.AUDIOBOOK]]
+    );
   });
 
   it('returns only non-sensitive request defaults and quota state', async () => {

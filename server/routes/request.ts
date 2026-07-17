@@ -1,11 +1,13 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import { HubMediaKind, HubRequestState } from '@server/constants/hub';
 import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import { HubRequest } from '@server/entity/HubRequest';
 import Media from '@server/entity/Media';
 import {
   BlocklistedMediaError,
@@ -337,13 +339,22 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
 
 requestRoutes.get('/count', async (_req, res, next) => {
   const requestRepository = getRepository(MediaRequest);
+  const hubRequestRepository = getRepository(HubRequest);
 
   try {
     const query = requestRepository
       .createQueryBuilder('request')
       .innerJoinAndSelect('request.media', 'media');
 
-    const totalCount = await query.getCount();
+    const [videoTotalCount, hubTotalCount, hubPendingCount] = await Promise.all(
+      [
+        query.getCount(),
+        hubRequestRepository.count(),
+        hubRequestRepository.count({
+          where: { state: HubRequestState.PENDING },
+        }),
+      ]
+    );
 
     const movieCount = await query
       .where('request.type = :requestType', {
@@ -405,11 +416,24 @@ requestRoutes.get('/count', async (_req, res, next) => {
       })
       .getCount();
 
+    const [musicArtistCount, musicAlbumCount, bookCount] = await Promise.all([
+      hubRequestRepository.count({
+        where: { kind: HubMediaKind.MUSIC_ARTIST },
+      }),
+      hubRequestRepository.count({
+        where: { kind: HubMediaKind.MUSIC_ALBUM },
+      }),
+      hubRequestRepository.count({ where: { kind: HubMediaKind.BOOK } }),
+    ]);
+
     return res.status(200).json({
-      total: totalCount,
+      total: videoTotalCount + hubTotalCount,
       movie: movieCount,
       tv: tvCount,
-      pending: pendingCount,
+      musicArtist: musicArtistCount,
+      musicAlbum: musicAlbumCount,
+      book: bookCount,
+      pending: pendingCount + hubPendingCount,
       approved: approvedCount,
       declined: declinedCount,
       processing: processingCount,

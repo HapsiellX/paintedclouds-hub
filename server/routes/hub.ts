@@ -153,6 +153,7 @@ const listSchema = z.object({
   take: z.coerce.number().int().min(1).max(250).default(100),
   skip: z.coerce.number().int().min(0).default(0),
   kinds: z.string().max(200).optional(),
+  formats: z.string().max(100).optional(),
   states: z.string().max(300).optional(),
   query: z.string().trim().max(200).optional(),
 });
@@ -926,6 +927,10 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
     return res.status(400).json({ message: 'Ungültige Seitengröße.' });
   const user = req.user as User;
   const admin = user.hasPermission(Permission.ADMIN);
+  const canViewAll = user.hasPermission(
+    [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+    { type: 'or' }
+  );
   const take = Math.min(parsed.data.take, 100);
   const requestedKinds = new Set(
     parsed.data.kinds
@@ -941,16 +946,23 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
         Object.values(HubRequestState).includes(state as HubRequestState)
       ) ?? []
   );
+  const requestedFormats = new Set(
+    parsed.data.formats
+      ?.split(',')
+      .filter((format) =>
+        Object.values(HubRequestFormat).includes(format as HubRequestFormat)
+      ) ?? []
+  );
   const activityQuery = parsed.data.query?.toLocaleLowerCase();
   const sourceLimit = Math.min(100, parsed.data.skip + take * 2);
   const [hubRequests, videoRequests] = await Promise.all([
     getRepository(HubRequest).find({
-      where: admin ? {} : { requestedBy: { id: user.id } },
+      where: canViewAll ? {} : { requestedBy: { id: user.id } },
       order: { createdAt: 'DESC' },
       take: sourceLimit,
     }),
     getRepository(MediaRequest).find({
-      where: admin ? {} : { requestedBy: { id: user.id } },
+      where: canViewAll ? {} : { requestedBy: { id: user.id } },
       order: { createdAt: 'DESC' },
       take: sourceLimit,
     }),
@@ -982,6 +994,8 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       source: 'seerr' as const,
       sourceId: request.id,
       kind: request.type,
+      provider: 'tmdb' as const,
+      externalId: String(request.media.tmdbId),
       title:
         detail && 'title' in detail
           ? detail.title
@@ -1009,6 +1023,12 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
   }));
   const filtered = [...hub, ...video]
     .filter((item) => !requestedKinds.size || requestedKinds.has(item.kind))
+    .filter(
+      (item) =>
+        !requestedFormats.size ||
+        ('formats' in item &&
+          item.formats?.some((format) => requestedFormats.has(format)))
+    )
     .filter((item) => !requestedStates.size || requestedStates.has(item.state))
     .filter(
       (item) =>

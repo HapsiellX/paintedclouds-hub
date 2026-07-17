@@ -11,7 +11,7 @@ import axios from 'axios';
 import type { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 
 type HubKind = 'movie' | 'tv' | 'music_artist' | 'music_album' | 'book';
 
@@ -228,6 +228,7 @@ const HubPage: NextPage = () => {
         formats,
         languages: ['de', 'en'],
       });
+      await mutate('/api/v1/request/count');
       setMessage(
         response.data.state === 'failed'
           ? response.data.errorMessage
