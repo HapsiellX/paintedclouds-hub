@@ -40,9 +40,10 @@ describe('Hub catalog item resolution', () => {
         { provider_id: 8, provider_name: 'Netflix' },
         { provider_id: 9, provider_name: 'Amazon Prime Video' },
         { provider_id: 337, provider_name: 'Disney Plus' },
+        { provider_id: 283, provider_name: 'Crunchyroll' },
         { provider_id: 100, provider_name: 'ARD Mediathek' },
       ]),
-      [8, 9, 337]
+      [8, 9, 337, 283]
     );
   });
   it('resolves canonical MusicBrainz album metadata from a fixed endpoint', async () => {

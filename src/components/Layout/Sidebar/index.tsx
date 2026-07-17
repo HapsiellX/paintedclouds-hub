@@ -27,7 +27,6 @@ import { useIntl } from 'react-intl';
 
 export const menuMessages = defineMessages('components.Layout.Sidebar', {
   dashboard: 'Home',
-  hub: 'Hub',
   foryou: 'For you',
   saved: 'Saved',
   browsemovies: 'Movies',
@@ -75,12 +74,6 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/saved/,
   },
   {
-    href: '/hub',
-    messagesKey: 'hub',
-    svgIcon: <SparklesIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/hub(?:$|\?query=)/,
-  },
-  {
     href: '/',
     messagesKey: 'dashboard',
     svgIcon: <SparklesIcon className="mr-3 h-6 w-6" />,
@@ -111,10 +104,10 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/books/,
   },
   {
-    href: '/hub#activity',
+    href: '/requests',
     messagesKey: 'requests',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/hub#activity/,
+    activeRegExp: /^\/requests/,
   },
   {
     href: '/blocklist',
@@ -254,8 +247,11 @@ const Sidebar = ({
                                 setClosed();
                               }
                             }}
-                            role="button"
-                            tabIndex={0}
+                            aria-current={
+                              router.asPath.match(sidebarLink.activeRegExp)
+                                ? 'page'
+                                : undefined
+                            }
                             className={`flex items-center rounded-md px-2 py-2 text-base font-medium leading-6 text-white transition duration-150 ease-in-out focus:outline-none ${
                               router.asPath.match(sidebarLink.activeRegExp)
                                 ? 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
@@ -322,6 +318,11 @@ const Sidebar = ({
                           : 'hover:bg-gray-700 focus:bg-gray-700'
                       } `}
                       data-testid={sidebarLink.dataTestId}
+                      aria-current={
+                        router.asPath.match(sidebarLink.activeRegExp)
+                          ? 'page'
+                          : undefined
+                      }
                     >
                       {sidebarLink.svgIcon}
                       {intl.formatMessage(

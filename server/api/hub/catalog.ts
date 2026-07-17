@@ -605,6 +605,9 @@ const majorStreamingProviderNames = new Set([
   'paramount plus',
   'wow',
   'max',
+  'crunchyroll',
+  'crunchyroll amazon channel',
+  'crunchyroll apple tv channel',
 ]);
 
 export const selectMajorStreamingProviderIds = (
@@ -722,9 +725,10 @@ export const loadHubRecommendationCandidates = async (
   musicPreferences: {
     genres?: string[];
     artists?: HubMusicArtistPreference[];
-  } = {}
+  } = {},
+  watchRegion = 'DE'
 ): Promise<{ items: HubCatalogItem[]; errors: string[] }> => {
-  const cacheKey = `${language.toLowerCase()}:${librarySeeds
+  const cacheKey = `${language.toLowerCase()}:${watchRegion.toUpperCase()}:${librarySeeds
     .map((seed) => `${seed.kind}:${seed.id}`)
     .sort()
     .join(',')}:${[...(musicPreferences.genres ?? [])].sort().join(',')}:${[
@@ -747,21 +751,21 @@ export const loadHubRecommendationCandidates = async (
   const loadCurrentStreamingTv = async () => {
     const providers = await tmdb.getTvWatchProviders({
       language,
-      watchRegion: 'DE',
+      watchRegion,
     });
     const providerIds = selectMajorStreamingProviderIds(providers).join('|');
     if (!providerIds)
       return { page: 1, total_pages: 0, total_results: 0, results: [] };
     return tmdb.getDiscoverTv({
       language,
-      firstAirDateGte: dateRange.from,
-      firstAirDateLte: dateRange.to,
+      airDateGte: dateRange.from,
+      airDateLte: dateRange.to,
       sortBy: 'popularity.desc',
       voteAverageGte: '7',
       voteCountGte: '50',
       watchProviders: providerIds,
       watchMonetizationTypes: 'flatrate',
-      watchRegion: 'DE',
+      watchRegion,
       originalLanguage: 'all',
     });
   };

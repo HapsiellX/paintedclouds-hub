@@ -25,6 +25,7 @@ const Layout = ({ children }: LayoutProps) => {
   const { currentSettings } = useSettings();
   const { setLocale } = useLocale();
   const usesPageSearch =
+    router.pathname === '/' ||
     router.pathname === '/hub' ||
     router.pathname === '/discover/music' ||
     router.pathname === '/discover/books';
