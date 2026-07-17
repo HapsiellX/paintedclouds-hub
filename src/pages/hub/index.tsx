@@ -310,7 +310,7 @@ const HubPage: NextPage = () => {
               setSubmittedQuery(normalizedQuery);
               void router.replace(
                 {
-                  pathname: '/hub',
+                  pathname: '/',
                   query: { query: normalizedQuery, kinds: kinds.join(',') },
                 },
                 undefined,

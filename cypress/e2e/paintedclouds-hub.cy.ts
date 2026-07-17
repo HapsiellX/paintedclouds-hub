@@ -33,11 +33,46 @@ describe('PaintedClouds Hub', () => {
   });
 
   it('offers direct navigation for every media group', () => {
-    cy.visit('/hub');
+    cy.visit('/');
+    cy.contains('a', 'Hub').should('not.exist');
+    cy.contains('a', 'Anfragen').should('have.attr', 'href', '/requests');
     cy.contains('a', 'Filme').should('exist');
     cy.contains('a', 'Serien & Anime').should('exist');
     cy.contains('a', 'Musik').should('exist');
     cy.contains('a', 'Bücher & Hörbücher').should('exist');
+  });
+
+  it('shows current movie, streaming series and anime shelves', () => {
+    const emptyPage = {
+      page: 1,
+      totalPages: 0,
+      totalResults: 0,
+      results: [],
+    };
+    cy.intercept('GET', '/api/v1/discover/trending*', emptyPage);
+    cy.intercept('GET', '/api/v1/discover/movies*', emptyPage);
+    cy.visit('/discover/movies');
+    cy.contains('Jetzt im Trend').should('be.visible');
+    cy.contains('Neue, beliebte Filme').should('be.visible');
+    cy.contains('Alle Filme').should('be.visible');
+
+    cy.intercept('GET', '/api/v1/discover/tv/current*', emptyPage);
+    cy.intercept('GET', '/api/v1/discover/tv*', emptyPage);
+    cy.visit('/discover/tv');
+    cy.contains('Gerade beliebt auf Streamingdiensten').should('be.visible');
+    cy.contains('Aktuell gefeierte Serien').should('be.visible');
+    cy.contains('Aktuelle beliebte Anime').should('be.visible');
+    cy.contains('Alle Serien & Anime').should('be.visible');
+  });
+
+  it('keeps personalization, discovery and requests reachable on mobile', () => {
+    cy.viewport('iphone-x');
+    cy.visit('/');
+    cy.get('nav').contains('a', 'Hub').should('not.exist');
+    cy.contains('a', 'Für dich').should('exist');
+    cy.contains('a', 'Merkliste').should('exist');
+    cy.get('button[aria-label="Weitere Navigation"]').click();
+    cy.contains('a', 'Anfragen').should('have.attr', 'href', '/requests');
   });
 
   it('shows curated music and book discovery shelves', () => {

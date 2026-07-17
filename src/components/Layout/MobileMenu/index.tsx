@@ -5,6 +5,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import { Transition } from '@headlessui/react';
 import {
   BookOpenIcon,
+  BookmarkIcon,
   ClockIcon,
   CogIcon,
   EllipsisHorizontalIcon,
@@ -13,11 +14,13 @@ import {
   FilmIcon,
   MusicalNoteIcon,
   SparklesIcon,
+  Squares2X2Icon,
   TvIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import {
   BookOpenIcon as FilledBookOpenIcon,
+  BookmarkIcon as FilledBookmarkIcon,
   ClockIcon as FilledClockIcon,
   CogIcon as FilledCogIcon,
   ExclamationTriangleIcon as FilledExclamationTriangleIcon,
@@ -25,6 +28,7 @@ import {
   FilmIcon as FilledFilmIcon,
   MusicalNoteIcon as FilledMusicalNoteIcon,
   SparklesIcon as FilledSparklesIcon,
+  Squares2X2Icon as FilledSquares2X2Icon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
   XMarkIcon,
@@ -76,6 +80,20 @@ const MobileMenu = ({
 
   const menuLinks: MenuLink[] = [
     {
+      href: '/for-you',
+      content: intl.formatMessage(menuMessages.foryou),
+      svgIcon: <Squares2X2Icon className="h-6 w-6" />,
+      svgIconSelected: <FilledSquares2X2Icon className="h-6 w-6" />,
+      activeRegExp: /^\/for-you/,
+    },
+    {
+      href: '/saved',
+      content: intl.formatMessage(menuMessages.saved),
+      svgIcon: <BookmarkIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledBookmarkIcon className="h-6 w-6" />,
+      activeRegExp: /^\/saved/,
+    },
+    {
       href: '/',
       content: intl.formatMessage(menuMessages.dashboard),
       svgIcon: <SparklesIcon className="h-6 w-6" />,
@@ -111,11 +129,11 @@ const MobileMenu = ({
       activeRegExp: /^\/discover\/books/,
     },
     {
-      href: '/hub#activity',
+      href: '/requests',
       content: intl.formatMessage(menuMessages.requests),
       svgIcon: <ClockIcon className="h-6 w-6" />,
       svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
-      activeRegExp: /^\/hub#activity/,
+      activeRegExp: /^\/requests/,
     },
     {
       href: '/blocklist',
@@ -214,14 +232,13 @@ const MobileMenu = ({
                 }
               }}
               onClick={() => setIsOpen(false)}
-              role="button"
-              tabIndex={0}
+              aria-current={isActive ? 'page' : undefined}
             >
               {cloneElement(isActive ? link.svgIconSelected : link.svgIcon, {
                 className: 'h-5 w-5',
               })}
               <span className="ml-2">{link.content}</span>
-              {link.href === '/hub#activity' &&
+              {link.href === '/requests' &&
                 pendingRequestsCount > 0 &&
                 hasPermission(Permission.MANAGE_REQUESTS) && (
                   <div className="ml-auto flex">
@@ -254,6 +271,8 @@ const MobileMenu = ({
                 <Link
                   key={`mobile-menu-link-${link.href}`}
                   href={link.href}
+                  aria-label={String(link.content)}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`relative flex flex-col items-center space-y-1 ${
                     isActive ? 'text-indigo-500' : ''
                   }`}
@@ -264,7 +283,10 @@ const MobileMenu = ({
                       className: 'h-6 w-6',
                     }
                   )}
-                  {link.href === '/hub#activity' &&
+                  <span className="max-w-16 truncate text-[10px] leading-none">
+                    {link.content}
+                  </span>
+                  {link.href === '/requests' &&
                     pendingRequestsCount > 0 &&
                     hasPermission(Permission.MANAGE_REQUESTS) && (
                       <div className="absolute bottom-3 left-3">
@@ -288,6 +310,9 @@ const MobileMenu = ({
             })}
           {filteredLinks.length > 4 && filteredLinks.length !== 5 && (
             <button
+              type="button"
+              aria-label={isOpen ? 'Menü schließen' : 'Weitere Navigation'}
+              aria-expanded={isOpen}
               className={`flex flex-col items-center space-y-1 ${
                 isOpen ? 'text-indigo-500' : ''
               }`}
@@ -298,6 +323,9 @@ const MobileMenu = ({
               ) : (
                 <EllipsisHorizontalIcon className="h-6 w-6" />
               )}
+              <span className="text-[10px] leading-none">
+                {isOpen ? 'Schließen' : 'Mehr'}
+              </span>
             </button>
           )}
         </div>

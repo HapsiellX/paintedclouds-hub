@@ -651,7 +651,10 @@ hubRoutes.get('/recommendations', hubCatalogLimiter, async (req, res) => {
     {
       genres: profile.musicGenres ?? [],
       artists: profile.musicArtists ?? [],
-    }
+    },
+    user.settings?.streamingRegion && user.settings.streamingRegion !== 'all'
+      ? user.settings.streamingRegion
+      : getSettings().main.discoverRegion || 'US'
   );
   const requestedKeys = new Set([
     ...hubRequests.map((request) =>

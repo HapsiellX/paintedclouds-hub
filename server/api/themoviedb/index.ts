@@ -100,6 +100,8 @@ interface DiscoverMovieOptions {
 interface DiscoverTvOptions {
   page?: number;
   language?: string;
+  airDateGte?: string;
+  airDateLte?: string;
   firstAirDateGte?: string;
   firstAirDateLte?: string;
   withRuntimeGte?: string;
@@ -111,6 +113,7 @@ interface DiscoverTvOptions {
   includeEmptyReleaseDate?: boolean;
   originalLanguage?: string;
   genre?: string;
+  excludeGenre?: string;
   network?: number;
   keywords?: string;
   excludeKeywords?: string;
@@ -675,11 +678,14 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     sortBy = 'popularity.desc',
     page = 1,
     language = this.locale,
+    airDateGte,
+    airDateLte,
     firstAirDateGte,
     firstAirDateLte,
     includeEmptyReleaseDate = false,
     originalLanguage,
     genre,
+    excludeGenre,
     network,
     keywords,
     excludeKeywords,
@@ -725,6 +731,8 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
             !firstAirDateLte && firstAirDateGte
               ? defaultFutureDate
               : firstAirDateLte,
+          'air_date.gte': airDateGte,
+          'air_date.lte': airDateLte,
           with_original_language:
             originalLanguage && originalLanguage !== 'all'
               ? originalLanguage
@@ -733,6 +741,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
                 : this.originalLanguage,
           include_null_first_air_dates: includeEmptyReleaseDate,
           with_genres: genre,
+          without_genres: excludeGenre,
           with_networks: network,
           with_keywords: keywords,
           without_keywords: excludeKeywords,

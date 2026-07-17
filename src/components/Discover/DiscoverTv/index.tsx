@@ -8,7 +8,9 @@ import {
   prepareFilterValues,
 } from '@app/components/Discover/constants';
 import FilterSlideover from '@app/components/Discover/FilterSlideover';
+import MediaSlider from '@app/components/MediaSlider';
 import useDiscover from '@app/hooks/useDiscover';
+import useLocale from '@app/hooks/useLocale';
 import { useUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -46,6 +48,7 @@ const SortOptions: Record<string, TMDBSortOptions> = {
 
 const DiscoverTv = () => {
   const intl = useIntl();
+  const { locale } = useLocale();
   const router = useRouter();
   const [showFilters, setShowFilters] = useState(false);
   const preparedFilters = prepareFilterValues(router.query);
@@ -68,12 +71,40 @@ const DiscoverTv = () => {
   }
 
   const title = intl.formatMessage(messages.discovertv);
+  const isGerman = locale === 'de';
 
   return (
     <>
       <PageTitle title={title} />
-      <div className="mb-4 flex flex-col justify-between lg:flex-row lg:items-end">
-        <Header>{title}</Header>
+      <Header>{isGerman ? 'Serien & Anime' : 'Series & Anime'}</Header>
+      <MediaSlider
+        sliderKey="current-streaming-series"
+        title={
+          isGerman
+            ? 'Gerade beliebt auf Streamingdiensten'
+            : 'Popular on streaming services now'
+        }
+        url="/api/v1/discover/tv/current"
+        extraParams="mode=popular"
+      />
+      <MediaSlider
+        sliderKey="current-acclaimed-series"
+        title={
+          isGerman ? 'Aktuell gefeierte Serien' : 'Acclaimed series right now'
+        }
+        url="/api/v1/discover/tv/current"
+        extraParams="mode=acclaimed"
+      />
+      <MediaSlider
+        sliderKey="current-streaming-anime"
+        title={isGerman ? 'Aktuelle beliebte Anime' : 'Popular anime right now'}
+        url="/api/v1/discover/tv/current"
+        extraParams="mode=anime"
+      />
+      <div className="mb-4 mt-8 flex flex-col justify-between lg:flex-row lg:items-end">
+        <h2 className="text-2xl font-bold text-white">
+          {isGerman ? 'Alle Serien & Anime' : 'All series & anime'}
+        </h2>
         <div className="mt-2 flex flex-grow flex-col sm:flex-row lg:flex-grow-0">
           <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
             <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100 sm:text-sm">
