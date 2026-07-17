@@ -154,7 +154,7 @@ export const reconcileHubRequests = async (
       } catch (error) {
         status.failed += 1;
         logger.warn('Hub request reconciliation failed', {
-          label: 'PaintedClouds Hub',
+          label: 'StefARR',
           requestId: request.id,
           errorMessage: (error as Error).message,
         });

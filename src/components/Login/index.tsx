@@ -29,6 +29,8 @@ const messages = defineMessages('components.Login', {
   signinwithjellyfin: 'Use your {mediaServerName} account',
   signinwithoverseerr: 'Use your {applicationTitle} account',
   orsigninwith: 'Or sign in with',
+  lineage: 'StefARR is built from the open-source Seerr project.',
+  licenseAndAttribution: 'License and attribution',
 });
 
 const Login = () => {
@@ -166,6 +168,26 @@ const Login = () => {
         <div className="relative h-48 w-full max-w-full">
           <Image src="/logo_stacked.svg" alt="Logo" fill />
         </div>
+        <p className="mt-5 text-center text-xs leading-5 text-gray-400">
+          {intl.formatMessage(messages.lineage)}{' '}
+          <a
+            href="https://github.com/seerr-team/seerr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-300 transition hover:text-indigo-200 hover:underline"
+          >
+            Seerr
+          </a>
+          {' · '}
+          <a
+            href="https://github.com/HapsiellX/paintedclouds-hub/blob/main/ATTRIBUTION.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-300 transition hover:text-indigo-200 hover:underline"
+          >
+            {intl.formatMessage(messages.licenseAndAttribution)}
+          </a>
+        </p>
       </div>
       <div className="relative z-50 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div

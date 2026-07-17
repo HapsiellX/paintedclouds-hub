@@ -4,11 +4,11 @@ import type * as OpenApiPlugin from 'docusaurus-plugin-openapi-docs';
 import { themes as prismThemes } from 'prism-react-renderer';
 
 const config: Config = {
-  title: 'Seerr',
-  tagline: 'One Stop Solution for all your media request needs',
+  title: 'StefARR by PaintedClouds',
+  tagline: 'Your private discovery and request hub for every media type',
   favicon: 'img/favicon.ico',
 
-  url: 'https://docs.seerr.dev',
+  url: 'https://github.com/HapsiellX/paintedclouds-hub',
   baseUrl: '/',
   trailingSlash: true,
 
@@ -18,8 +18,8 @@ const config: Config = {
     },
   },
 
-  organizationName: 'seerr-team',
-  projectName: 'seerr',
+  organizationName: 'HapsiellX',
+  projectName: 'paintedclouds-hub',
   deploymentBranch: 'gh-pages',
 
   onBrokenLinks: 'throw',
@@ -43,7 +43,8 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
           path: '../docs',
-          editUrl: 'https://github.com/seerr-team/seerr/edit/develop/docs/',
+          editUrl:
+            'https://github.com/HapsiellX/paintedclouds-hub/edit/main/docs/',
           docItemComponent: '@theme/ApiItem',
           async sidebarItemsGenerator({
             defaultSidebarItemsGenerator,
@@ -81,7 +82,7 @@ const config: Config = {
               groupPathsBy: 'tag',
             },
             downloadUrl:
-              'https://raw.githubusercontent.com/seerr-team/seerr/refs/heads/develop/seerr-api.yml',
+              'https://raw.githubusercontent.com/HapsiellX/paintedclouds-hub/refs/heads/main/seerr-api.yml',
             hideSendButton: true,
           } satisfies OpenApiPlugin.Options,
         },
@@ -112,7 +113,7 @@ const config: Config = {
     },
     navbar: {
       logo: {
-        alt: 'Seerr',
+        alt: 'StefARR by PaintedClouds',
         src: 'img/logo_full.svg',
       },
       items: [
@@ -122,17 +123,7 @@ const config: Config = {
           position: 'right',
         },
         {
-          to: 'blog',
-          label: 'Blog',
-          position: 'right',
-        },
-        {
-          href: 'https://discord.gg/seerr',
-          label: 'Discord',
-          position: 'right',
-        },
-        {
-          href: 'https://github.com/seerr-team/seerr',
+          href: 'https://github.com/HapsiellX/paintedclouds-hub',
           label: 'GitHub',
           position: 'right',
         },
@@ -158,30 +149,26 @@ const config: Config = {
           title: 'Project',
           items: [
             {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
               label: 'GitHub',
-              href: 'https://github.com/seerr-team/seerr',
+              href: 'https://github.com/HapsiellX/paintedclouds-hub',
             },
           ],
         },
         {
-          title: 'Community',
+          title: 'Project lineage',
           items: [
             {
-              label: 'Discord',
-              href: 'https://discord.gg/seerr',
+              label: 'Attribution',
+              href: 'https://github.com/HapsiellX/paintedclouds-hub/blob/main/ATTRIBUTION.md',
             },
             {
-              label: 'Github Discussions',
-              href: 'https://github.com/seerr-team/seerr/discussions',
+              label: 'Seerr upstream',
+              href: 'https://github.com/seerr-team/seerr',
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Seerr. Built with Docusaurus.`,
+      copyright: `StefARR by PaintedClouds. Independent MIT-licensed fork of Seerr. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.shadesOfPurple,

@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-PaintedClouds Hub is alpha software. Until a stable support policy is announced,
+StefARR by PaintedClouds is beta software. Until a stable support policy is announced,
 only the newest published release is eligible for security fixes. Development
 branches and older images are unsupported.
 
@@ -45,7 +45,7 @@ request or integration boundaries.
 
 Availability problems in third-party services, insecure configuration of an
 operator's network, and upstream vulnerabilities with no additional
-PaintedClouds Hub impact should normally be reported to the responsible project.
+StefARR impact should normally be reported to the responsible project.
 If in doubt, use the private advisory channel and explain the relationship.
 
 ## Deployment Responsibilities

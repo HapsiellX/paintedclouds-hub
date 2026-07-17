@@ -1,28 +1,28 @@
 {
-  "name": "Seerr",
-  "short_name": "Seerr",
+  "name": "StefARR by PaintedClouds",
+  "short_name": "StefARR",
   "start_url": "./",
   "icons": [
     {
-      "src": "./android-chrome-192x192.png",
+      "src": "./stefarr-icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./android-chrome-192x192_maskable.png",
+      "src": "./stefarr-icon-192x192-maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "./android-chrome-512x512.png",
+      "src": "./stefarr-icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./android-chrome-512x512_maskable.png",
+      "src": "./stefarr-icon-512x512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

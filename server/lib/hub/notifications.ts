@@ -27,7 +27,7 @@ export const notifyHomeAssistant = async (
     );
   } catch (e) {
     logger.warn('Home Assistant notification failed', {
-      label: 'PaintedClouds Hub',
+      label: 'StefARR',
       event,
       errorMessage: e.message,
     });

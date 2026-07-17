@@ -66,8 +66,8 @@ ENV NODE_ENV=production
 ENV COMMIT_TAG=${COMMIT_TAG}
 ENV APP_VERSION=${BUILD_VERSION}
 
-LABEL org.opencontainers.image.title="PaintedClouds Hub" \
-  org.opencontainers.image.description="Experimental multi-media request hub based on Seerr" \
+LABEL org.opencontainers.image.title="StefARR by PaintedClouds" \
+  org.opencontainers.image.description="Cross-media discovery and request hub based on Seerr" \
   org.opencontainers.image.source="${REPOSITORY_URL}" \
   org.opencontainers.image.revision="${COMMIT_TAG}" \
   org.opencontainers.image.version="${BUILD_VERSION}" \
@@ -84,6 +84,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY --chown=node:node package.json ./package.json
+COPY --chown=node:node LICENSE ATTRIBUTION.md ./
 COPY --chown=node:node next.config.ts ./next.config.ts
 COPY --chown=node:node seerr-api.yml ./seerr-api.yml
 COPY --chown=node:node public ./public

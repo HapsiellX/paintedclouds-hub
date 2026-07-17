@@ -1,21 +1,36 @@
 # Changelog
 
-This file records PaintedClouds Hub changes followed by preserved upstream
+This file records StefARR by PaintedClouds changes followed by preserved upstream
 history. Upstream entries are the work of their respective Overseerr,
 Jellyseerr, and Seerr contributors and are retained for provenance; they are not
-claims of authorship by PaintedClouds Hub.
+claims of authorship by StefARR or PaintedClouds.
 
-PaintedClouds Hub is an independent fork and is not affiliated with or endorsed
+StefARR is an independent MIT-licensed fork and is not affiliated with or endorsed
 by those upstream projects. Published release notes must identify the exact
 source commit, upstream base, supported migration path, known limitations,
 container digest, and rollback requirements.
 
-## Unreleased
+## 0.6.0-beta.1
+
+### StefARR rebrand
+
+- Adopted **StefARR by PaintedClouds** as the public product and documentation
+  name while retaining compatible technical identifiers where an immediate
+  rename would break upgrades or existing deployments.
+- Kept the Seerr origin prominent: the fork is based on Seerr `v3.3.0` at
+  `703faf95f454ffecae99a5e86ea761b3b524c6df`, remains MIT-licensed, and is not
+  affiliated with or endorsed by Seerr.
+- Required every release to identify both that exact upstream base and the
+  exact StefARR source commit.
+- Added an original cloud-and-tool StefARR logo, refreshed PWA/install assets,
+  and migrated only the former default application and sender names.
+- Preserved API, database, configuration, image-repository, and deployment
+  identifiers that existing installations rely on.
 
 ### V0.3
 
 - Pointed the backend updater, release feed, About page, support links and
-  package metadata at the official PaintedClouds Hub GitHub repository.
+  package metadata at the official project GitHub repository.
 - Added robust tag-based semantic version checks and a cached authenticated
   release-feed endpoint instead of direct browser calls to upstream GitHub.
 - Added encrypted first-class Prowlarr and SABnzbd settings with a one-time
@@ -50,7 +65,7 @@ container digest, and rollback requirements.
 
 ### Alpha limitations
 
-- No PaintedClouds Hub release has been declared stable.
+- No StefARR release has been declared stable.
 - Migration compatibility and exact artifact coordinates will be stated only in
   an individual published release.
 - Book edition matching and downstream acquisition-state synchronization remain

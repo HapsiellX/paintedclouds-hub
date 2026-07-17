@@ -1,4 +1,4 @@
-describe('PaintedClouds Hub', () => {
+describe('StefARR by PaintedClouds', () => {
   beforeEach(() => {
     cy.request('POST', '/api/v1/auth/jellyfin', {
       username: Cypress.env('JELLYFIN_USERNAME'),

@@ -10,7 +10,7 @@ export interface SettingsContextProps {
 
 const defaultSettings = {
   initialized: false,
-  applicationTitle: 'Seerr',
+  applicationTitle: 'StefARR by PaintedClouds',
   applicationUrl: '',
   hideAvailable: false,
   hideBlocklisted: false,

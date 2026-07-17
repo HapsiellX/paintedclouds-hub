@@ -14,6 +14,40 @@ const mergeSettings = <T>(current: T, incoming: Partial<T>): T =>
     Array.isArray(srcValue) ? srcValue : undefined
   ) as T;
 
+export const DEFAULT_APPLICATION_TITLE = 'StefARR by PaintedClouds';
+const LEGACY_DEFAULT_APPLICATION_TITLES = new Set([
+  'Seerr',
+  'PaintedClouds Hub',
+]);
+const LEGACY_DEFAULT_EMAIL_SENDER_NAMES = new Set([
+  'Seerr',
+  'PaintedClouds Hub',
+]);
+
+/**
+ * Updates only brand defaults that shipped with an earlier release. Instance
+ * names and sender names chosen by an administrator are deliberately preserved.
+ */
+export const migrateLegacyBrandDefaults = (
+  settings: Pick<AllSettings, 'main' | 'notifications'>
+): boolean => {
+  let changed = false;
+
+  if (LEGACY_DEFAULT_APPLICATION_TITLES.has(settings.main.applicationTitle)) {
+    settings.main.applicationTitle = DEFAULT_APPLICATION_TITLE;
+    changed = true;
+  }
+
+  const emailSender = settings.notifications.agents.email.options.senderName;
+  if (emailSender && LEGACY_DEFAULT_EMAIL_SENDER_NAMES.has(emailSender)) {
+    settings.notifications.agents.email.options.senderName =
+      DEFAULT_APPLICATION_TITLE;
+    changed = true;
+  }
+
+  return changed;
+};
+
 export interface Library {
   id: string;
   name: string;
@@ -450,7 +484,7 @@ class Settings {
       vapidPublic: '',
       main: {
         apiKey: '',
-        applicationTitle: 'Seerr',
+        applicationTitle: DEFAULT_APPLICATION_TITLE,
         applicationUrl: '',
         cacheImages: false,
         defaultPermissions: Permission.REQUEST,
@@ -552,7 +586,7 @@ class Settings {
               ignoreTls: false,
               requireTls: false,
               allowSelfSigned: false,
-              senderName: 'Seerr',
+              senderName: DEFAULT_APPLICATION_TITLE,
               usePublicLogo: false,
             },
           },
@@ -936,6 +970,10 @@ class Settings {
       this.data = merged;
     } else if (data) {
       this.data = JSON.parse(data);
+    }
+
+    if (!raw && migrateLegacyBrandDefaults(this.data)) {
+      change = true;
     }
 
     // generate keys and ids if it's missing

@@ -30,7 +30,7 @@ const loadKey = (create: boolean): Buffer => {
     cachedKey = key;
   }
   if (cachedKey.length !== 32) {
-    throw new Error('The PaintedClouds Hub secrets key is invalid.');
+    throw new Error('The StefARR secrets key is invalid.');
   }
   fs.chmodSync(keyPath, 0o600);
   return cachedKey;

@@ -1175,7 +1175,7 @@ hubRoutes.post('/requests', hubCreateLimiter, async (req, res) => {
       });
     } catch {
       logger.error('Hub request submission failed', {
-        label: 'PaintedClouds Hub',
+        label: 'StefARR',
         requestId: request.id,
       });
       request.state = HubRequestState.FAILED;
@@ -1313,7 +1313,7 @@ hubRoutes.use(
   ) => {
     if (res.headersSent) return next(error);
     logger.error('Hub route failed', {
-      label: 'PaintedClouds Hub',
+      label: 'StefARR',
       method: req.method,
       path: req.path,
     });

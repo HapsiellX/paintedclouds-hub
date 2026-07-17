@@ -1,8 +1,8 @@
 # paintedclouds-hub
 
-![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.3.0](https://img.shields.io/badge/AppVersion-0.3.0-informational?style=flat-square)
+![Version: 0.6.0-beta.1](https://img.shields.io/badge/Version-0.6.0--beta.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.6.0-beta.1](https://img.shields.io/badge/AppVersion-0.6.0--beta.1-informational?style=flat-square)
 
-Experimental PaintedClouds Hub Helm chart for Kubernetes
+StefARR by PaintedClouds Helm chart for Kubernetes
 
 **Homepage:** <https://github.com/HapsiellX/paintedclouds-hub>
 
@@ -10,7 +10,7 @@ Experimental PaintedClouds Hub Helm chart for Kubernetes
 
 | Name | Email | Url |
 | ---- | ------ | --- |
-| PaintedClouds Hub maintainers |  | <https://github.com/HapsiellX/paintedclouds-hub> |
+| StefARR maintainers |  | <https://github.com/HapsiellX/paintedclouds-hub> |
 
 ## Source Code
 
@@ -22,13 +22,13 @@ Kubernetes: `>=1.23.0-0`
 
 ## Installation
 
-Use the [PaintedClouds Hub Kubernetes guide](../../docs/getting-started/kubernetes.mdx).
-The chart is distributed as source only in V0.3; pin the container digest from
+Use the [StefARR Kubernetes guide](../../docs/getting-started/kubernetes.mdx).
+The chart is distributed as source only in V0.6 beta; pin the container digest from
 the matching signed GitHub release.
 
 ## Update Notes
 
-PaintedClouds Hub is stateful and supports one application replica. Back up the
+StefARR is stateful and supports one application replica. Back up the
 database, configuration volume and `hub-secrets.key` together before upgrades.
 
 ## Values

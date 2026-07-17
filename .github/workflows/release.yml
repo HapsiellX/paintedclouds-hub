@@ -162,7 +162,7 @@ jobs:
         run: |
           trivy image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL \
             "$IMAGE@$CANDIDATE_DIGEST"
-          trivy image --format cyclonedx --output paintedclouds-hub.cdx.json \
+          trivy image --format cyclonedx --output stefarr.cdx.json \
             "$IMAGE@$CANDIDATE_DIGEST"
 
       - name: Promote exact digest to version and release channel
@@ -186,6 +186,7 @@ jobs:
           IMAGE: ${{ steps.release.outputs.image }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_digest }}
           IMAGE_VERSION: ${{ steps.release.outputs.image_version }}
           IS_PRERELEASE: ${{ steps.release.outputs.prerelease }}
@@ -194,6 +195,16 @@ jobs:
           Container: \`$IMAGE:$IMAGE_VERSION\`
 
           Immutable digest: \`$IMAGE@$CANDIDATE_DIGEST\`
+
+          StefARR source commit: \`$CANDIDATE_SHA\`
+
+          Upstream basis: Seerr \`v3.3.0\` at
+          \`703faf95f454ffecae99a5e86ea761b3b524c6df\`.
+
+          StefARR by PaintedClouds is an independent MIT-licensed fork of Seerr.
+          It is not affiliated with, endorsed by, or supported by Seerr or its
+          maintainers. The original notices are retained in LICENSE and
+          ATTRIBUTION.md.
 
           Verify the keyless signature:
 
@@ -211,8 +222,8 @@ jobs:
           else
             release_flags+=(--latest)
           fi
-          gh release create "$VERSION" paintedclouds-hub.cdx.json \
+          gh release create "$VERSION" stefarr.cdx.json \
             --verify-tag \
             "${release_flags[@]}" \
-            --title "PaintedClouds Hub $VERSION" \
+            --title "StefARR by PaintedClouds $VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md"

@@ -1,9 +1,11 @@
-# Contributing to PaintedClouds Hub
+# Contributing to StefARR
 
-Thank you for helping improve PaintedClouds Hub. By participating, you agree to
+Thank you for helping improve **StefARR by PaintedClouds**. By participating, you agree to
 follow the [Code of Conduct](./CODE_OF_CONDUCT.md) and this guide.
 
-PaintedClouds Hub is an independent Seerr fork. Use this repository for
+StefARR is an independent MIT-licensed Seerr fork. It is based on Seerr
+`v3.3.0` at `703faf95f454ffecae99a5e86ea761b3b524c6df` and is not affiliated
+with or endorsed by Seerr. Use this repository for
 fork-specific work. Contributions intended for Seerr must follow
 [Seerr's own contribution process](https://github.com/seerr-team/seerr/blob/develop/CONTRIBUTING.md).
 

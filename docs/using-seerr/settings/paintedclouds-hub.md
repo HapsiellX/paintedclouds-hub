@@ -1,12 +1,12 @@
 ---
-title: PaintedClouds Hub
+title: StefARR
 description: Configure music, book, quota, metadata, and reconciliation workflows.
 sidebar_position: 5
 ---
 
-# PaintedClouds Hub settings
+# StefARR settings
 
-Open **Settings → PaintedClouds Hub** as an administrator. This screen is the
+Open **Settings → StefARR** as an administrator. This screen is the
 authoritative configuration source from V0.2 onward.
 
 ## Acquisition services
@@ -24,7 +24,7 @@ and non-HTTP protocols are rejected.
 
 ## Metadata and matching
 
-Provide a monitored project contact email. PaintedClouds Hub identifies itself
+Provide a monitored project contact email. StefARR identifies itself
 to MusicBrainz and Open Library and sends that address to those providers.
 Search results are cached for six hours, detail data for 24 hours, and stale
 data can be served for up to seven days during a provider outage.

@@ -1,18 +1,18 @@
 ---
 title: Kubernetes
-description: Run PaintedClouds Hub on Kubernetes from the project chart source.
+description: Run StefARR by PaintedClouds on Kubernetes from the project chart source.
 sidebar_position: 4
 ---
 
 # Kubernetes
 
-The V0.3 repository contains an experimental PaintedClouds Hub chart under
+The V0.3 repository contains an experimental StefARR by PaintedClouds chart under
 [`charts/seerr-chart`](https://github.com/HapsiellX/paintedclouds-hub/tree/main/charts/seerr-chart),
 but no signed OCI chart is published yet. Do not install the upstream Seerr
 chart: it deploys a different application image and follows a different release
 channel.
 
-For production, render the chart from the exact signed PaintedClouds Hub source
+For production, render the chart from the exact signed StefARR by PaintedClouds source
 tag and pin `image.sha` to the digest from that version's GitHub release:
 
 ```bash
@@ -25,7 +25,7 @@ helm upgrade --install paintedclouds-hub \
   --set image.sha=sha256:RELEASE_DIGEST
 ```
 
-PaintedClouds Hub is stateful and supports exactly one application replica.
+StefARR by PaintedClouds is stateful and supports exactly one application replica.
 Provide persistent storage for `/app/config`, back up the configuration and
 database together, and retain `hub-secrets.key`. Verify the container image
 signature and SBOM attestation before deployment.

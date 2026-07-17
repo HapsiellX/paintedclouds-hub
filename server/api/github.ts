@@ -94,7 +94,7 @@ class GithubAPI extends ExternalAPI {
       return data.filter((release) => !release.draft);
     } catch (e) {
       logger.warn(
-        "Failed to retrieve PaintedClouds Hub releases. The update status can't be checked right now.",
+        "Failed to retrieve StefARR releases. The update status can't be checked right now.",
         { label: 'GitHub API', errorMessage: e.message }
       );
       return [];
@@ -122,7 +122,7 @@ class GithubAPI extends ExternalAPI {
       return data;
     } catch (e) {
       logger.warn(
-        "Failed to retrieve PaintedClouds Hub commits. The development update status can't be checked right now.",
+        "Failed to retrieve StefARR commits. The development update status can't be checked right now.",
         { label: 'GitHub API', errorMessage: e.message }
       );
       return [];
