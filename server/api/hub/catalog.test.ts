@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  buildHubRecentMusicQuery,
   HubCatalogItemNotFoundError,
   resolveHubCatalogItem,
+  selectMajorStreamingProviderIds,
 } from '@server/api/hub/catalog';
 import { HubMediaKind } from '@server/constants/hub';
 import type { AxiosInstance } from 'axios';
@@ -17,6 +19,32 @@ const unusedClient = {
 } as unknown as CatalogClient;
 
 describe('Hub catalog item resolution', () => {
+  it('builds bounded current-release queries for genres and artists', () => {
+    const now = new Date('2026-07-17T12:00:00.000Z');
+    assert.strictEqual(
+      buildHubRecentMusicQuery({ genre: 'rock "live"' }, now),
+      'firstreleasedate:[2026-01-17 TO 2026-07-17] AND primarytype:(album OR single OR ep) AND tag:"rock \\"live\\""'
+    );
+    assert.match(
+      buildHubRecentMusicQuery(
+        { artistId: '123e4567-e89b-42d3-a456-426614174000' },
+        now
+      ),
+      /arid:123e4567-e89b-42d3-a456-426614174000$/
+    );
+  });
+
+  it('selects streaming services and excludes linear television providers', () => {
+    assert.deepStrictEqual(
+      selectMajorStreamingProviderIds([
+        { provider_id: 8, provider_name: 'Netflix' },
+        { provider_id: 9, provider_name: 'Amazon Prime Video' },
+        { provider_id: 337, provider_name: 'Disney Plus' },
+        { provider_id: 100, provider_name: 'ARD Mediathek' },
+      ]),
+      [8, 9, 337]
+    );
+  });
   it('resolves canonical MusicBrainz album metadata from a fixed endpoint', async () => {
     const calls: string[] = [];
     const id = '123e4567-e89b-42d3-a456-426614174000';
