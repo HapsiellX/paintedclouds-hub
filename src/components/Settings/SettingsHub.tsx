@@ -157,7 +157,7 @@ const SettingsHub = () => {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-bold">PaintedClouds Hub</h1>
+        <h1 className="text-2xl font-bold">StefARR integrations</h1>
         <p className="mt-2 text-gray-400">
           {tr(
             'Integrationen, Standards, Statusabgleich und sichere automatische Freigaben.',

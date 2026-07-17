@@ -1,8 +1,8 @@
 # Privacy and External Data Flows
 
-PaintedClouds Hub is self-hosted. The person or organization operating an
+StefARR by PaintedClouds is self-hosted. The person or organization operating an
 instance controls its users, configuration, logs, database, integrations,
-retention, and legal obligations. The PaintedClouds Hub project does not
+retention, and legal obligations. The StefARR project does not
 operate hosted instances and does not receive an instance's data merely because
 the software is installed.
 

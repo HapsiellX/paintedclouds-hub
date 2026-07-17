@@ -265,12 +265,12 @@ export const startJobs = (): void => {
 
   scheduledJobs.push({
     id: 'hub-reconciliation',
-    name: 'PaintedClouds Hub Reconciliation',
+    name: 'StefARR Request Reconciliation',
     type: 'process',
     interval: 'minutes',
     cronSchedule: jobs['hub-reconciliation'].schedule,
     job: schedule.scheduleJob(jobs['hub-reconciliation'].schedule, () => {
-      logger.info('Starting scheduled job: Hub Reconciliation', {
+      logger.info('Starting scheduled job: StefARR Request Reconciliation', {
         label: 'Jobs',
       });
       void reconcileHubRequests();

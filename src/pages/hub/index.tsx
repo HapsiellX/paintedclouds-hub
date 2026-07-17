@@ -287,7 +287,7 @@ const HubPage: NextPage = () => {
         }}
       >
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-indigo-300">
-          PaintedClouds Hub
+          StefARR by PaintedClouds
         </p>
         <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl">
           {tr(

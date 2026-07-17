@@ -134,7 +134,7 @@ export const submitHubRequest = async (
       break;
     default:
       throw new Error(
-        'Film- und Serienwünsche werden über Seerrs vorhandenen Request-Endpunkt verarbeitet'
+        'Film- und Serienwünsche werden über StefARRs vorhandenen Request-Endpunkt verarbeitet'
       );
   }
   request.targetId = targetId;

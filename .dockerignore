@@ -21,7 +21,8 @@ Dockerfile*
 compose.yaml
 gen-docs
 docs
-LICENSE
+!LICENSE
+!ATTRIBUTION.md
 node_modules
 .env
 .env.*

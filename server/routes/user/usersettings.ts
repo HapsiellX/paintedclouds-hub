@@ -290,7 +290,7 @@ userSettingsRoutes.post<{ authToken: string }>(
     // Do not allow linking of an already linked account
     if (await userRepository.exist({ where: { plexId: account.id } })) {
       return res.status(422).json({
-        message: 'This Plex account is already linked to a Seerr user',
+        message: 'This Plex account is already linked to a StefARR user',
       });
     }
 
@@ -393,7 +393,7 @@ userSettingsRoutes.post<{ username: string; password: string }>(
       })
     ) {
       return res.status(422).json({
-        message: 'The specified account is already linked to a Seerr user',
+        message: 'The specified account is already linked to a StefARR user',
       });
     }
 
@@ -428,7 +428,7 @@ userSettingsRoutes.post<{ username: string; password: string }>(
         })
       ) {
         return res.status(422).json({
-          message: 'The specified account is already linked to a Seerr user',
+          message: 'The specified account is already linked to a StefARR user',
         });
       }
 

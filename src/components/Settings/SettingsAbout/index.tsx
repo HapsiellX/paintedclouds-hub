@@ -16,7 +16,7 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.Settings.SettingsAbout', {
   about: 'About',
-  aboutseerr: 'About PaintedClouds Hub',
+  aboutseerr: 'About StefARR by PaintedClouds',
   version: 'Version',
   totalmedia: 'Total Media',
   totalrequests: 'Total Requests',
@@ -24,13 +24,24 @@ const messages = defineMessages('components.Settings.SettingsAbout', {
   githubdiscussions: 'GitHub Discussions',
   timezone: 'Time Zone',
   appDataPath: 'Data Directory',
-  supportseerr: 'Contribute to PaintedClouds Hub',
+  supportseerr: 'Contribute to StefARR',
   contribute: 'Make a Contribution',
   documentation: 'Documentation',
   outofdate: 'Out of Date',
   uptodate: 'Up to Date',
   runningDevelop:
-    'You are running a development build of PaintedClouds Hub. Use it only for development or release testing.',
+    'You are running a development build of StefARR. Use it only for development or release testing.',
+  lineage: 'Open-source lineage',
+  lineageFoundation: 'Project foundation',
+  lineageFoundationDescription:
+    'StefARR is an independent PaintedClouds project built from the open-source Seerr project.',
+  seerrProject: 'Visit the Seerr project',
+  licensing: 'Licenses and attribution',
+  projectLicense: 'StefARR license',
+  attribution: 'Upstream attribution',
+  independence: 'Independent project',
+  independenceDescription:
+    'StefARR is not affiliated with or endorsed by the Seerr team. Product names and trademarks belong to their respective owners.',
 });
 
 const SettingsAbout = () => {
@@ -126,6 +137,48 @@ const SettingsAbout = () => {
               <code>{data.tz}</code>
             </List.Item>
           )}
+        </List>
+      </div>
+      <div className="section">
+        <List title={intl.formatMessage(messages.lineage)}>
+          <List.Item title={intl.formatMessage(messages.lineageFoundation)}>
+            <div className="max-w-2xl text-right">
+              <p>{intl.formatMessage(messages.lineageFoundationDescription)}</p>
+              <a
+                href="https://github.com/seerr-team/seerr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-500 transition duration-300 hover:underline"
+              >
+                {intl.formatMessage(messages.seerrProject)}
+              </a>
+            </div>
+          </List.Item>
+          <List.Item title={intl.formatMessage(messages.licensing)}>
+            <div className="flex flex-col items-end gap-1">
+              <a
+                href="https://github.com/HapsiellX/paintedclouds-hub/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-500 transition duration-300 hover:underline"
+              >
+                {intl.formatMessage(messages.projectLicense)}
+              </a>
+              <a
+                href="https://github.com/HapsiellX/paintedclouds-hub/blob/main/ATTRIBUTION.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-500 transition duration-300 hover:underline"
+              >
+                {intl.formatMessage(messages.attribution)}
+              </a>
+            </div>
+          </List.Item>
+          <List.Item title={intl.formatMessage(messages.independence)}>
+            <p className="max-w-2xl text-right">
+              {intl.formatMessage(messages.independenceDescription)}
+            </p>
+          </List.Item>
         </List>
       </div>
       <div className="section">

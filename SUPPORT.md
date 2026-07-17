@@ -1,9 +1,10 @@
 # Support
 
-PaintedClouds Hub is community-maintained software. Support is best-effort and
+StefARR by PaintedClouds is community-maintained software. Support is best-effort and
 no response or resolution time is guaranteed.
 
-PaintedClouds Hub is independent from Seerr. Do not ask the Seerr maintainers or
+StefARR is an independent MIT-licensed fork of Seerr and is not affiliated with
+or endorsed by Seerr. Do not ask the Seerr maintainers or
 community to diagnose fork-specific behavior. If a problem is confirmed to
 exist unchanged in upstream Seerr, link the upstream report rather than
 cross-posting without context.
@@ -11,7 +12,7 @@ cross-posting without context.
 ## Before Asking for Help
 
 1. Read the README, release notes, supported scope, and open issues.
-2. Confirm that the problem occurs on the newest supported PaintedClouds Hub
+2. Confirm that the problem occurs on the newest supported StefARR
    release.
 3. Check the health and logs of the relevant downstream service.
 4. Reproduce with the smallest safe configuration possible.

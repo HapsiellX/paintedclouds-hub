@@ -2,7 +2,7 @@
 
 ## Our Pledge
 
-We pledge to make participation in the PaintedClouds Hub community a
+We pledge to make participation in the StefARR by PaintedClouds community a
 harassment-free experience for everyone, regardless of age, body size, visible
 or invisible disability, ethnicity, sex characteristics, gender identity and
 expression, level of experience, education, socioeconomic status, nationality,

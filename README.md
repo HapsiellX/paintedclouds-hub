@@ -1,25 +1,32 @@
-# PaintedClouds Hub
+# StefARR by PaintedClouds
 
-![PaintedClouds Hub cross-media artwork](./public/images/paintedclouds-hub-hero-v0.3.webp)
+![StefARR cross-media artwork](./public/images/paintedclouds-hub-hero-v0.3.webp)
 
-PaintedClouds Hub is an independent, open-source media request and discovery
+**StefARR by PaintedClouds** is an independent, open-source media request and discovery
 manager for self-hosted libraries. It extends the movie and television
 workflows inherited from [Seerr](https://github.com/seerr-team/seerr) with
 music, e-book, and audiobook discovery and request workflows.
+
+StefARR is a modified MIT-licensed fork of Seerr, based on upstream Seerr
+`v3.3.0` at commit `703faf95f454ffecae99a5e86ea761b3b524c6df`.
+PaintedClouds develops and publishes this fork independently. StefARR is not
+affiliated with, endorsed by, or supported by the Seerr project or its
+maintainers. Please report StefARR problems in this repository, not through
+Seerr's support channels. The upstream copyright and MIT notice remain visible
+in [LICENSE](./LICENSE), with additional lineage in
+[ATTRIBUTION.md](./ATTRIBUTION.md).
 
 > [!IMPORTANT]
 > Back up the configuration directory and database before every upgrade. Use
 > only a signed release image and a migration path explicitly listed in its
 > release notes.
 
-V0.5 current discovery is available as a public beta. See the
+V0.6 introduces the StefARR identity as a public beta. Read the
+[branding, compatibility, and upgrade notes](docs/v0.6-stefarr-rebrand.md).
+The current-media discovery behavior introduced in V0.5 is documented in the
 [music-source, recency, streaming, and upgrade notes](docs/v0.5-current-discovery.md)
 and the underlying
 [personalization privacy model](docs/v0.4-personalization-beta.md).
-
-PaintedClouds Hub is an independent fork. It is not affiliated with, endorsed
-by, or supported by the Seerr project or its maintainers. Please report
-PaintedClouds Hub problems here, not to Seerr's support channels.
 
 ## What It Does
 
@@ -34,7 +41,7 @@ PaintedClouds Hub problems here, not to Seerr's support channels.
 - Supports Jellyfin, Plex, and Emby authentication inherited from Seerr.
 - Supports SQLite and PostgreSQL.
 
-## V0.3 Supported Scope
+## Current Supported Scope
 
 - Music and book requests use canonical MusicBrainz and Open Library identities.
   Books with multiple editions require an explicit edition selection.
@@ -45,14 +52,15 @@ PaintedClouds Hub problems here, not to Seerr's support channels.
 - Core Hub administration, activity, discovery, detail and request workflows
   are supported in English and German.
 - The application home, global search, navigation and release information now
-  use one cross-media PaintedClouds workflow and the official project GitHub
+  use one cross-media StefARR workflow and the official project GitHub
   repository.
 - Prowlarr and SABnzbd health integrations are configured and encrypted in the
   Admin UI; legacy runtime key mounts can be removed after the V0.3 migration.
 - Request approval, retry and decline transitions reject stale or concurrent
   actions, and credentialed integration calls never follow redirects.
-- Personalization, AI recommendations, Readarr and additional acquisition
-  backends are not part of V0.2.
+- Personalization is local and does not use LLMs, playback monitoring, or
+  collaborative tracking. Readarr and additional acquisition backends are not
+  part of the current scope.
 - External metadata and cover services may return incomplete results, throttle
   requests, or be unavailable.
 - Migration and rollback compatibility is guaranteed only where a release note
@@ -73,7 +81,7 @@ Before installation:
    supported.
 3. Prepare Jellyfin, Plex, or Emby and the acquisition services you intend to
    use.
-4. Configure integration credentials in the authenticated Hub Admin UI.
+4. Configure integration credentials in the authenticated StefARR Admin UI.
 5. Place the application behind HTTPS when it is reachable outside a trusted
    network.
 
@@ -83,9 +91,9 @@ supported architectures, and tested Compose example belong to each release.
 
 For source development, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## Hub Configuration
+## StefARR Configuration
 
-Configure Hub integrations under **Settings → PaintedClouds Hub**. API keys and
+Configure integrations under **Settings → StefARR**. API keys and
 the optional Home Assistant webhook are encrypted with AES-256-GCM and are
 never returned by the API. Back up both `settings.json` and
 `hub-secrets.key`; without the latter the encrypted values cannot be recovered.
@@ -130,14 +138,14 @@ image and the matching pre-upgrade database/configuration backup.
 
 ## Data Sources and Attribution
 
-PaintedClouds Hub uses metadata or artwork from services including TMDB,
+StefARR uses metadata or artwork from services including TMDB,
 MusicBrainz, Cover Art Archive, and Open Library. Their data, artwork, names,
-and trademarks are not relicensed under PaintedClouds Hub's software license.
+and trademarks are not relicensed under StefARR's software license.
 See [ATTRIBUTION.md](./ATTRIBUTION.md) for source, license, and usage notices.
 
 ## License
 
-PaintedClouds Hub is distributed under the MIT License. The original copyright
+StefARR is distributed under the MIT License. The original copyright
 and license notice are preserved in [LICENSE](./LICENSE). See
 [ATTRIBUTION.md](./ATTRIBUTION.md) for the upstream lineage and third-party
 notices.

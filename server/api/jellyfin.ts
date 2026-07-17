@@ -143,7 +143,7 @@ class JellyfinAPI extends ExternalAPI {
         ? '1.0.0'
         : getAppVersion();
 
-    let authHeaderVal = `MediaBrowser Client="Seerr", Device="Seerr", DeviceId="${safeDeviceId}", Version="${version}"`;
+    let authHeaderVal = `MediaBrowser Client="StefARR", Device="StefARR", DeviceId="${safeDeviceId}", Version="${version}"`;
     if (authToken) {
       authHeaderVal += `, Token="${authToken}"`;
     }

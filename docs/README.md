@@ -3,33 +3,41 @@ slug: /
 sidebar_position: 1
 ---
 
-# Introduction
+# StefARR by PaintedClouds
 
-Welcome to the Seerr Documentation.
+Welcome to the StefARR documentation.
 
-**Seerr** is a free and open source software application for managing requests for your media library. It integrates with the media server of your choice: [Jellyfin](https://jellyfin.org), [Plex](https://plex.tv), and [Emby](https://emby.media/). In addition, it integrates with your existing services, such as **[Sonarr](https://sonarr.tv/)**, **[Radarr](https://radarr.video/)**, and **[Lidarr](https://lidarr.audio/)**.
+**StefARR by PaintedClouds** is a free and open-source discovery and request
+manager for self-hosted media libraries. It connects Jellyfin, Plex, or Emby
+with Sonarr and Radarr for films and series, Lidarr for music, and
+LazyLibrarian for e-books and audiobooks.
+
+StefARR is an independent MIT-licensed fork of
+[Seerr](https://github.com/seerr-team/seerr), based on upstream Seerr `v3.3.0`
+at commit `703faf95f454ffecae99a5e86ea761b3b524c6df`. StefARR and PaintedClouds
+are not affiliated with, endorsed by, or supported by Seerr or its maintainers.
+The original license notice and complete project lineage remain available in
+[LICENSE](https://github.com/HapsiellX/paintedclouds-hub/blob/main/LICENSE) and
+[ATTRIBUTION.md](https://github.com/HapsiellX/paintedclouds-hub/blob/main/ATTRIBUTION.md).
 
 ## Features
 
-- **Full Jellyfin/Emby/Plex integration**. Login and manage user access with Jellyfin/Emby/Plex.
-- **Syncs to your Jellyfin/Emby/Plex library** to show what titles you already have.
-- Supports Movies, Shows and Mixed Libraries.
-- **Integrates with Sonarr, Radarr, and Lidarr**.
-- Optionally set **Override rules** for requests to match with your defined conditions.
-- **Easy to use request system** allowing users to request individual seasons or movies in a friendly, clean UI.
-- **Simple request management UI**. Don't dig through the app to approve recent requests.
-- **Mobile-friendly design**, for when you need to approve requests on the go.
-- Granular permission system.
-- Localization into other languages.
-- Support for **PostgreSQL** and **SQLite** databases.
-- Support for various notification agents.
-- Easily **Watchlist** or **Blocklist** media.
-- More features to come!
+- Jellyfin, Plex, and Emby login, user access, and library synchronization.
+- Film and series discovery and requests through Sonarr and Radarr.
+- Artist and album discovery and music requests through Lidarr.
+- E-book and audiobook discovery and requests through LazyLibrarian.
+- Personal, local recommendations without playback tracking or cross-user
+  profiling.
+- A shared watchlist, explicit feedback, availability indicators, request
+  management, granular permissions, and notification agents.
+- English and German interfaces, mobile-friendly workflows, and support for
+  PostgreSQL and SQLite.
 
-## We need your help!
+## Contributing and support
 
-[Seerr](https://github.com/seerr-team/seerr) is an ambitious project developers/contributors poured a lot of work into, and we still have a lot more to do. Seerr is the result of a collaborative effort between the original Overseerr project and the Jellyseerr fork, created to deliver an excellent request management solution for Plex, Jellyfin and Emby users.
-
-We value your feedback and support in identifying and fixing bugs to make Seerr even better. As an open-source project, we welcome contributions from everyone. Contribution includes building new features, patching bugs, translating the application, or even just writing documentation.
-
-If you would like to contribute, please be sure to review our [contribution guidelines](https://github.com/HapsiellX/paintedclouds-hub/blob/main/CONTRIBUTING.md).
+Bug reports, documentation, translations, tests, design, and focused code
+contributions are welcome. Use the real project repository for StefARR-specific
+work and do not send fork-specific support requests to Seerr. Before
+contributing, read the
+[contribution guidelines](https://github.com/HapsiellX/paintedclouds-hub/blob/main/CONTRIBUTING.md)
+and [support policy](https://github.com/HapsiellX/paintedclouds-hub/blob/main/SUPPORT.md).

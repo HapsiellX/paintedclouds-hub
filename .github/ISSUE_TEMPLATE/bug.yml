@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible PaintedClouds Hub defect
+description: Report a reproducible StefARR defect
 title: "[Bug]: "
 labels: ["awaiting triage"]
 type: bug
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        PaintedClouds Hub is independent from Seerr. Report fork-specific bugs here.
+        StefARR by PaintedClouds is independent from Seerr. Report fork-specific bugs here.
         Do not include API keys, cookies, webhook URLs, private addresses, or personal data.
         Security vulnerabilities must use the private process in SECURITY.md.
   - type: textarea
@@ -21,7 +21,7 @@ body:
     id: version
     attributes:
       label: Version and digest
-      description: Exact PaintedClouds Hub version, commit, and container digest when available.
+      description: Exact StefARR version, commit, and container digest when available.
     validations:
       required: true
   - type: dropdown
@@ -67,7 +67,7 @@ body:
     attributes:
       label: Checks
       options:
-        - label: I reproduced this on the newest supported PaintedClouds Hub release.
+        - label: I reproduced this on the newest supported StefARR release.
           required: true
         - label: I searched open and closed issues for duplicates.
           required: true

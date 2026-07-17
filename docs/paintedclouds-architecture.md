@@ -1,10 +1,16 @@
-# PaintedClouds Hub architecture
+# StefARR architecture
 
-PaintedClouds Hub is an independent Seerr fork that adds catalog aggregation
+StefARR by PaintedClouds is an independent MIT-licensed Seerr fork that adds catalog aggregation
 and request workflows for artists, albums, e-books, and audiobooks. Existing
 Seerr entities and request paths remain responsible for movie and television
 media. Hub-specific modules avoid broadening Seerr's TMDB-oriented `Media`
 entity with incompatible identifiers and lifecycle states.
+
+The fork is based on Seerr `v3.3.0` at
+`703faf95f454ffecae99a5e86ea761b3b524c6df`; it is not affiliated with or
+endorsed by Seerr. Existing `Hub` names in APIs, database entities, environment
+variables, and file paths are compatibility identifiers and are not the public
+product name.
 
 ## Components
 
@@ -39,7 +45,7 @@ entity with incompatible identifiers and lifecycle states.
 
 ## Sources of truth
 
-- PaintedClouds Hub owns user request policy, approval state, and its audit
+- StefARR owns user request policy, approval state, and its audit
   records.
 - Sonarr, Radarr, Lidarr, and LazyLibrarian own acquisition execution state.
 - Jellyfin, Plex, Emby, and audiobook-library software own library availability
@@ -55,7 +61,7 @@ downstream service being unavailable.
 
 ## Deployment model
 
-PaintedClouds Hub is designed for self-hosting. It should run as a non-root
+StefARR is designed for self-hosting. It should run as a non-root
 container with persistent configuration storage, HTTPS at the network edge, and
 network access limited to required users and integrations. Downstream service
 ports and databases should not be exposed to untrusted networks.

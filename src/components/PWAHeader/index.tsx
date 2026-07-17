@@ -2,7 +2,9 @@ interface PWAHeaderProps {
   applicationTitle?: string;
 }
 
-const PWAHeader = ({ applicationTitle = 'Seerr' }: PWAHeaderProps) => {
+const PWAHeader = ({
+  applicationTitle = 'StefARR by PaintedClouds',
+}: PWAHeaderProps) => {
   return (
     <>
       <link
@@ -164,7 +166,7 @@ const PWAHeader = ({ applicationTitle = 'Seerr' }: PWAHeaderProps) => {
       <meta name="apple-mobile-web-app-title" content={applicationTitle} />
       <meta
         name="description"
-        content="Request and Media Discovery Application"
+        content="Cross-media discovery and request hub by PaintedClouds"
       />
       <meta name="format-detection" content="telephone=no" />
       <meta name="mobile-web-app-capable" content="yes" />

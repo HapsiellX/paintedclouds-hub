@@ -19,7 +19,7 @@ const messages = defineMessages('components.Settings', {
   menuJobs: 'Jobs & Cache',
   menuAbout: 'About',
   menuMetadataProviders: 'Metadata Providers',
-  menuHub: 'PaintedClouds Hub',
+  menuHub: 'StefARR integrations',
 });
 
 type SettingsLayoutProps = {

@@ -2,7 +2,9 @@
 
 ## Project Status
 
-PaintedClouds Hub is an independent, community-maintained Seerr fork in alpha.
+StefARR by PaintedClouds is an independent, community-maintained,
+MIT-licensed Seerr fork in public beta. It is not affiliated with or endorsed
+by Seerr.
 This governance model is intentionally lightweight and can evolve as the
 maintainer group grows.
 
@@ -42,7 +44,8 @@ release workflow. Release maintainers must verify:
 - test, build, migration, and installation results;
 - registry destinations and artifact digests;
 - vulnerability, secret, dependency-license, and SBOM results;
-- release notes, known limitations, upstream base, and rollback guidance;
+- release notes, known limitations, the exact upstream base and exact StefARR
+  source commit, and rollback guidance;
 - signatures and attestations where the release process supports them.
 
 When at least two active maintainers are available, a different maintainer must
@@ -69,7 +72,7 @@ qualified reviewer is available.
 
 The project should preserve a clear upstream remote and regularly assess Seerr
 security and maintenance changes. Contributions suitable for Seerr may be
-offered upstream, subject to Seerr's contribution rules. PaintedClouds Hub
+offered upstream, subject to Seerr's contribution rules. StefARR
 maintainers must not imply that upstream will support fork-specific code.
 
 ## Amendments
