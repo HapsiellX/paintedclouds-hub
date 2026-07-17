@@ -21,7 +21,7 @@ in [LICENSE](./LICENSE), with additional lineage in
 > only a signed release image and a migration path explicitly listed in its
 > release notes.
 
-V0.6 introduces the StefARR identity as a public beta. Read the
+V0.6 is the first stable release under the StefARR identity. Read the
 [branding, compatibility, and upgrade notes](docs/v0.6-stefarr-rebrand.md).
 The current-media discovery behavior introduced in V0.5 is documented in the
 [music-source, recency, streaming, and upgrade notes](docs/v0.5-current-discovery.md)

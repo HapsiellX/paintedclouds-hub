@@ -10,7 +10,7 @@ by those upstream projects. Published release notes must identify the exact
 source commit, upstream base, supported migration path, known limitations,
 container digest, and rollback requirements.
 
-## 0.6.0-beta.1
+## 0.6.0
 
 ### StefARR rebrand
 

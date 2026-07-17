@@ -1,6 +1,6 @@
 # paintedclouds-hub
 
-![Version: 0.6.0-beta.1](https://img.shields.io/badge/Version-0.6.0--beta.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.6.0-beta.1](https://img.shields.io/badge/AppVersion-0.6.0--beta.1-informational?style=flat-square)
+![Version: 0.6.0](https://img.shields.io/badge/Version-0.6.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.6.0](https://img.shields.io/badge/AppVersion-0.6.0-informational?style=flat-square)
 
 StefARR by PaintedClouds Helm chart for Kubernetes
 
@@ -23,7 +23,7 @@ Kubernetes: `>=1.23.0-0`
 ## Installation
 
 Use the [StefARR Kubernetes guide](../../docs/getting-started/kubernetes.mdx).
-The chart is distributed as source only in V0.6 beta; pin the container digest from
+The chart is distributed as source only in V0.6; pin the container digest from
 the matching signed GitHub release.
 
 ## Update Notes
