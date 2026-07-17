@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { before, beforeEach, describe, it, mock } from 'node:test';
 
+import { HubMediaKind, HubRequestState } from '@server/constants/hub';
 import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import { HubRequest } from '@server/entity/HubRequest';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
@@ -185,6 +187,39 @@ describe('DELETE /request/:requestId', () => {
     const res = await agent.delete('/request/99999999');
 
     assert.strictEqual(res.status, 404);
+  });
+});
+
+describe('GET /request/count', () => {
+  it('includes pending music and book requests in unified totals', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const before = await agent.get('/request/count');
+    assert.strictEqual(before.status, 200);
+    const requestedBy = await getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    const created = await getRepository(HubRequest).save(
+      new HubRequest({
+        kind: HubMediaKind.BOOK,
+        provider: 'openlibrary',
+        externalId: 'OLCOUNTW',
+        title: 'Counted audiobook',
+        state: HubRequestState.PENDING,
+        points: 2,
+        requestedBy,
+        idempotencyKey: 'request-count-test',
+      })
+    );
+
+    try {
+      const after = await agent.get('/request/count');
+      assert.strictEqual(after.status, 200);
+      assert.strictEqual(after.body.total, before.body.total + 1);
+      assert.strictEqual(after.body.pending, before.body.pending + 1);
+      assert.strictEqual(after.body.book, (before.body.book ?? 0) + 1);
+    } finally {
+      await getRepository(HubRequest).remove(created);
+    }
   });
 });
 

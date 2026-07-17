@@ -10,6 +10,19 @@ by those upstream projects. Published release notes must identify the exact
 source commit, upstream base, supported migration path, known limitations,
 container digest, and rollback requirements.
 
+## 0.6.1
+
+### Unified requests
+
+- Replaced the video-only requests tab with one chronological activity view for
+  movies, series, anime, artists, groups, albums, e-books, and audiobooks.
+- Added media-type, format, status, and text filters plus request history and
+  management actions without weakening per-user request isolation.
+- Included music and book requests in the navigation and application badge
+  counts and refreshed the count immediately after cross-media requests.
+- Added regression coverage for every request category and separate e-book and
+  audiobook filtering.
+
 ## 0.6.0
 
 ### StefARR rebrand

@@ -3,7 +3,7 @@ import axios from 'axios';
 import type { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 
 type DetailKind = 'music_artist' | 'music_album' | 'book';
 interface CatalogItem {
@@ -119,6 +119,7 @@ const HubDetailPage: NextPage = () => {
             }
           : {}),
       });
+      await mutate('/api/v1/request/count');
       setMessage(
         response.data.state === 'pending'
           ? tr(
