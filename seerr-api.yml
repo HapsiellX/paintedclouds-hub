@@ -8357,6 +8357,10 @@ paths:
           description: Comma-separated media kinds
           schema: { type: string }
         - in: query
+          name: formats
+          description: Comma-separated book formats (ebook or audiobook)
+          schema: { type: string }
+        - in: query
           name: states
           description: Comma-separated normalized Hub states
           schema: { type: string }
