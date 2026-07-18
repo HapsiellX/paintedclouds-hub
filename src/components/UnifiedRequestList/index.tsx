@@ -4,6 +4,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import useLocale from '@app/hooks/useLocale';
 import { Permission, useUser } from '@app/hooks/useUser';
 import {
+  ArrowDownTrayIcon,
   BookOpenIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -12,10 +13,12 @@ import {
   TvIcon,
 } from '@heroicons/react/24/outline';
 import { buildHubActivityUrl } from '@server/lib/hub/activityUrl';
+import type { HubDownloadProgress } from '@server/lib/hub/downloadProgress';
 import axios from 'axios';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import useSWR, { mutate } from 'swr';
+import DownloadProgress from './DownloadProgress';
 
 type RequestKind = 'movie' | 'tv' | 'music_artist' | 'music_album' | 'book';
 type RequestFormat = 'ebook' | 'audiobook';
@@ -37,6 +40,18 @@ interface UnifiedRequest {
   requestedBy: { id: number; displayName: string; avatar: string };
   createdAt: string;
   updatedAt: string;
+  is4k?: boolean;
+  downloadProgress?: HubDownloadProgress;
+}
+
+interface DownloadQueueItem {
+  id: string;
+  kind: 'movie' | 'tv';
+  externalId: string;
+  title: string;
+  imageUrl?: string;
+  is4k: boolean;
+  downloadProgress: HubDownloadProgress;
 }
 
 interface ActivityResponse {
@@ -45,6 +60,7 @@ interface ActivityResponse {
   skip: number;
   total: number;
   hasMore: boolean;
+  queue?: DownloadQueueItem[];
 }
 
 interface HistoryEvent {
@@ -92,6 +108,25 @@ const UnifiedRequestList = () => {
     isLoading,
     mutate: refreshActivity,
   } = useSWR<ActivityResponse>(activityUrl, { refreshInterval: 30_000 });
+  const downloadQueue = data?.queue ?? [];
+  const queueTotalBytes = downloadQueue.reduce(
+    (total, item) => total + item.downloadProgress.totalBytes,
+    0
+  );
+  const queueDownloadedBytes = downloadQueue.reduce(
+    (total, item) => total + item.downloadProgress.downloadedBytes,
+    0
+  );
+  const queueProgress = queueTotalBytes
+    ? Math.round((queueDownloadedBytes / queueTotalBytes) * 100)
+    : downloadQueue.length
+      ? Math.round(
+          downloadQueue.reduce(
+            (total, item) => total + item.downloadProgress.progress,
+            0
+          ) / downloadQueue.length
+        )
+      : 0;
   const { data: history, isLoading: historyLoading } = useSWR<{
     results: HistoryEvent[];
   }>(
@@ -229,6 +264,104 @@ const UnifiedRequestList = () => {
         </label>
       </div>
 
+      {data && (
+        <section
+          aria-labelledby="download-queue-heading"
+          className="rounded-xl border border-gray-700 bg-gray-800/60 p-4"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ArrowDownTrayIcon
+                className="h-5 w-5 text-indigo-300"
+                aria-hidden="true"
+              />
+              <h2
+                id="download-queue-heading"
+                className="font-semibold text-white"
+              >
+                {tr('Download-Warteschlange', 'Download queue')}
+              </h2>
+            </div>
+            <span className="rounded-full bg-gray-700 px-2.5 py-1 text-xs text-gray-200">
+              {downloadQueue.length}
+            </span>
+          </div>
+
+          {downloadQueue.length ? (
+            <>
+              <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between text-xs text-gray-300">
+                  <span>{tr('Gesamtfortschritt', 'Overall progress')}</span>
+                  <span>{queueProgress}%</span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label={tr(
+                    'Gesamtfortschritt der Warteschlange',
+                    'Overall queue progress'
+                  )}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={queueProgress}
+                  className="h-3 overflow-hidden rounded-full bg-gray-700"
+                >
+                  <div
+                    className="h-full rounded-full bg-indigo-500 transition-[width] duration-300 motion-reduce:transition-none"
+                    style={{ width: `${queueProgress}%` }}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {downloadQueue.map((item) => (
+                  <article
+                    key={item.id}
+                    className="flex gap-3 rounded-lg border border-gray-700 bg-gray-900/40 p-3"
+                  >
+                    <div
+                      className="flex h-16 w-11 flex-none items-center justify-center rounded bg-gray-900 bg-cover bg-center text-indigo-300"
+                      style={
+                        item.imageUrl
+                          ? { backgroundImage: `url(${item.imageUrl})` }
+                          : undefined
+                      }
+                      aria-hidden="true"
+                    >
+                      {!item.imageUrl && <KindIcon kind={item.kind} />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <Link
+                          href={`/${item.kind}/${item.externalId}`}
+                          className="truncate font-medium text-white hover:text-indigo-300 hover:underline"
+                        >
+                          {item.title}
+                        </Link>
+                        {item.is4k && (
+                          <span className="rounded bg-amber-700 px-1.5 py-0.5 text-xs text-white">
+                            4K
+                          </span>
+                        )}
+                      </div>
+                      <DownloadProgress
+                        progress={item.downloadProgress}
+                        detailed
+                      />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-gray-400">
+              {tr(
+                'Zurzeit sind keine Filme oder Folgen in der Download-Warteschlange.',
+                'There are currently no movies or episodes in the download queue.'
+              )}
+            </p>
+          )}
+        </section>
+      )}
+
       {actionError && (
         <p role="alert" className="rounded-lg bg-red-900/50 p-3 text-red-200">
           {actionError}
@@ -304,6 +437,11 @@ const UnifiedRequestList = () => {
                           <p className="mt-2 text-sm text-red-300">
                             {request.errorMessage}
                           </p>
+                        )}
+                        {request.downloadProgress && (
+                          <DownloadProgress
+                            progress={request.downloadProgress}
+                          />
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">

@@ -30,6 +30,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { submitHubRequest } from '@server/lib/hub/acquisition';
 import { withHubMetadataCache } from '@server/lib/hub/cache';
+import { summarizeHubDownloads } from '@server/lib/hub/downloadProgress';
 import {
   HUB_SUBMISSION_FAILED_MESSAGE,
   toHubRequestDto,
@@ -977,6 +978,10 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
           })
         : tmdb.getTvShow({ tvId: request.media.tmdbId, language: req.locale })
     ).catch(() => undefined);
+    const downloadProgress = summarizeHubDownloads(
+      request.media[request.is4k ? 'downloadStatus4k' : 'downloadStatus']
+    );
+    const mediaStatus = request.media[request.is4k ? 'status4k' : 'status'];
     const state =
       request.status === MediaRequestStatus.PENDING
         ? HubRequestState.PENDING
@@ -984,11 +989,13 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
           ? HubRequestState.DECLINED
           : request.status === MediaRequestStatus.FAILED
             ? HubRequestState.FAILED
-            : request.media.status === MediaStatus.AVAILABLE
+            : mediaStatus === MediaStatus.AVAILABLE
               ? HubRequestState.AVAILABLE
-              : request.status === MediaRequestStatus.COMPLETED
-                ? HubRequestState.IMPORTED
-                : HubRequestState.SUBMITTED;
+              : downloadProgress
+                ? HubRequestState.DOWNLOADING
+                : request.status === MediaRequestStatus.COMPLETED
+                  ? HubRequestState.IMPORTED
+                  : HubRequestState.SUBMITTED;
     return {
       id: `video:${request.id}`,
       source: 'seerr' as const,
@@ -996,6 +1003,7 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       kind: request.type,
       provider: 'tmdb' as const,
       externalId: String(request.media.tmdbId),
+      is4k: request.is4k,
       title:
         detail && 'title' in detail
           ? detail.title
@@ -1013,6 +1021,7 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       },
       createdAt: request.createdAt,
       updatedAt: request.updatedAt,
+      ...(downloadProgress ? { downloadProgress } : {}),
     };
   });
   const hub = hubRequests.map((request) => ({
@@ -1042,8 +1051,27 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   const results = filtered.slice(parsed.data.skip, parsed.data.skip + take);
+  const queue = [
+    ...new Map(
+      video
+        .filter((item) => item.downloadProgress)
+        .map((item) => [
+          `${item.kind}:${item.externalId}:${item.is4k}`,
+          {
+            id: item.id,
+            kind: item.kind,
+            externalId: item.externalId,
+            title: item.title,
+            imageUrl: item.imageUrl,
+            is4k: item.is4k,
+            downloadProgress: item.downloadProgress!,
+          },
+        ])
+    ).values(),
+  ];
   return res.json({
     results,
+    queue,
     take,
     skip: parsed.data.skip,
     total: filtered.length,

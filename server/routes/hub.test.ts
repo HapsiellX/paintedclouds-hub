@@ -22,6 +22,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import downloadTracker from '@server/lib/downloadtracker';
 import { createHubRateLimiter } from '@server/lib/hub/rateLimit';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
@@ -365,6 +366,63 @@ describe('Hub authorization and privacy', () => {
       ),
       [[HubRequestFormat.AUDIOBOOK]]
     );
+  });
+
+  it('returns a privacy-safe download queue with movie progress', async () => {
+    const videoRequest = await seedVideoRequest(
+      'friend@seerr.dev',
+      MediaType.MOVIE,
+      303
+    );
+    videoRequest.media.serviceId = 1;
+    videoRequest.media.externalServiceId = 303;
+    await getRepository(Media).save(videoRequest.media);
+    videoRequest.status = MediaRequestStatus.APPROVED;
+    await getRepository(MediaRequest).save(videoRequest);
+    const otherRequest = await seedVideoRequest(
+      'admin@seerr.dev',
+      MediaType.MOVIE,
+      404
+    );
+    otherRequest.media.serviceId = 1;
+    otherRequest.media.externalServiceId = 404;
+    await getRepository(Media).save(otherRequest.media);
+    otherRequest.status = MediaRequestStatus.APPROVED;
+    await getRepository(MediaRequest).save(otherRequest);
+    const originalMovieProgress = downloadTracker.getMovieProgress;
+    downloadTracker.getMovieProgress = () => [
+      {
+        mediaType: MediaType.MOVIE,
+        externalId: 303,
+        size: 2_000,
+        sizeLeft: 500,
+        status: 'downloading',
+        timeLeft: '00:05:00',
+        estimatedCompletionTime: new Date('2026-07-18T20:00:00Z'),
+        title: 'private.release.name',
+        downloadId: 'private-download-id',
+      },
+    ];
+
+    try {
+      const agent = await loginAs('friend@seerr.dev');
+      const activity = await agent.get('/hub/activity?take=20');
+      assert.strictEqual(activity.status, 200);
+      assert.strictEqual(activity.body.queue.length, 1);
+      assert.strictEqual(activity.body.queue[0].id, `video:${videoRequest.id}`);
+      assert.strictEqual(activity.body.queue[0].downloadProgress.progress, 75);
+      assert.strictEqual(activity.body.results[0].state, 'downloading');
+      assert.strictEqual(
+        activity.body.results[0].downloadProgress.progress,
+        75
+      );
+      assert.ok(
+        !JSON.stringify(activity.body).includes('private.release.name')
+      );
+      assert.ok(!JSON.stringify(activity.body).includes('private-download-id'));
+    } finally {
+      downloadTracker.getMovieProgress = originalMovieProgress;
+    }
   });
 
   it('returns only non-sensitive request defaults and quota state', async () => {

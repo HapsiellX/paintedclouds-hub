@@ -86,6 +86,30 @@ describe('StefARR by PaintedClouds', () => {
       expect(requestUrl.searchParams.has('query')).to.equal(false);
       request.reply({
         results: [],
+        queue: [
+          {
+            id: 'video:303',
+            kind: 'movie',
+            externalId: '303',
+            title: 'Fortschrittsfilm',
+            is4k: false,
+            downloadProgress: {
+              progress: 75,
+              status: 'downloading',
+              downloadedBytes: 1_500_000_000,
+              totalBytes: 2_000_000_000,
+              episodeCount: 0,
+              parts: [
+                {
+                  progress: 75,
+                  status: 'downloading',
+                  timeLeft: '00:05:00',
+                  episodes: [],
+                },
+              ],
+            },
+          },
+        ],
         take: 20,
         skip: 0,
         total: 0,
@@ -97,6 +121,12 @@ describe('StefARR by PaintedClouds', () => {
     cy.wait('@requestActivity').its('response.statusCode').should('eq', 200);
     cy.contains('Die Anfragen konnten nicht geladen werden.').should(
       'not.exist'
+    );
+    cy.contains('Download-Warteschlange').should('be.visible');
+    cy.contains('Fortschrittsfilm').should('be.visible');
+    cy.get('[role=progressbar][aria-valuenow=75]').should(
+      'have.length.at.least',
+      1
     );
   });
 
