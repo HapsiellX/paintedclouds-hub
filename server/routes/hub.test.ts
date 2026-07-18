@@ -578,10 +578,16 @@ describe('Hub OpenAPI contract', () => {
     ) as {
       paths: Record<
         string,
-        { get: { parameters: { in: string; name: string }[] } }
+        {
+          get: {
+            parameters: { in: string; name: string }[];
+            responses: Record<string, Record<string, unknown>>;
+          };
+        }
       >;
     };
-    const queryParameters = specification.paths['/hub/activity'].get.parameters
+    const activityOperation = specification.paths['/hub/activity'].get;
+    const queryParameters = activityOperation.parameters
       .filter((parameter) => parameter.in === 'query')
       .map((parameter) => parameter.name);
 
@@ -593,5 +599,12 @@ describe('Hub OpenAPI contract', () => {
       'states',
       'query',
     ]);
+    assert.deepStrictEqual(Object.keys(activityOperation.responses['200']), [
+      'description',
+    ]);
+    assert.strictEqual(
+      typeof activityOperation.responses['200'].description,
+      'string'
+    );
   });
 });
