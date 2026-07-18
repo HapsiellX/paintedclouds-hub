@@ -11,6 +11,7 @@ import {
   MusicalNoteIcon,
   TvIcon,
 } from '@heroicons/react/24/outline';
+import { buildHubActivityUrl } from '@server/lib/hub/activityUrl';
 import axios from 'axios';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -77,13 +78,14 @@ const UnifiedRequestList = () => {
     return { kinds: mediaFilter, formats: '' };
   }, [mediaFilter]);
 
-  const activityUrl = `/api/v1/hub/activity?take=${PAGE_SIZE}&skip=${
-    (page - 1) * PAGE_SIZE
-  }&kinds=${encodeURIComponent(kinds)}&formats=${encodeURIComponent(
-    formats
-  )}&states=${encodeURIComponent(stateFilter)}&query=${encodeURIComponent(
-    query
-  )}`;
+  const activityUrl = buildHubActivityUrl({
+    take: PAGE_SIZE,
+    skip: (page - 1) * PAGE_SIZE,
+    kinds,
+    formats,
+    states: stateFilter,
+    query,
+  });
   const {
     data,
     error,

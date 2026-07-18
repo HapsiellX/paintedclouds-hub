@@ -75,6 +75,31 @@ describe('StefARR by PaintedClouds', () => {
     cy.contains('a', 'Anfragen').should('have.attr', 'href', '/requests');
   });
 
+  it('loads requests without sending empty optional filters', () => {
+    cy.intercept('GET', '/api/v1/hub/activity*', (request) => {
+      const requestUrl = new URL(request.url);
+      expect(requestUrl.searchParams.get('take')).to.equal('20');
+      expect(requestUrl.searchParams.get('skip')).to.equal('0');
+      expect(requestUrl.searchParams.has('kinds')).to.equal(false);
+      expect(requestUrl.searchParams.has('formats')).to.equal(false);
+      expect(requestUrl.searchParams.has('states')).to.equal(false);
+      expect(requestUrl.searchParams.has('query')).to.equal(false);
+      request.reply({
+        results: [],
+        take: 20,
+        skip: 0,
+        total: 0,
+        hasMore: false,
+      });
+    }).as('requestActivity');
+
+    cy.visit('/requests');
+    cy.wait('@requestActivity').its('response.statusCode').should('eq', 200);
+    cy.contains('Die Anfragen konnten nicht geladen werden.').should(
+      'not.exist'
+    );
+  });
+
   it('shows curated music and book discovery shelves', () => {
     cy.visit('/discover/music');
     cy.get('[data-testid=music-discover-shelves]').should('be.visible');
