@@ -10,6 +10,15 @@ by those upstream projects. Published release notes must identify the exact
 source commit, upstream base, supported migration path, known limitations,
 container digest, and rollback requirements.
 
+## 0.6.2
+
+### Request filter contract
+
+- Declared the e-book and audiobook activity filter in the public OpenAPI
+  contract so the central request validator accepts the unified requests page.
+- Added a regression check that keeps the implemented activity query parameters
+  and the runtime API contract aligned.
+
 ## 0.6.1
 
 ### Unified requests

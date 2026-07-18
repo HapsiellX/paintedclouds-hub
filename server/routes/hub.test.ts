@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { before, beforeEach, describe, it } from 'node:test';
 
 import {
@@ -27,6 +29,7 @@ import { setupTestDb } from '@server/test/db';
 import type { Express } from 'express';
 import express from 'express';
 import session from 'express-session';
+import yaml from 'js-yaml';
 import request from 'supertest';
 import authRoutes from './auth';
 import hubRoutes from './hub';
@@ -507,5 +510,30 @@ describe('Hub inbound rate limits', () => {
       code: 'RATE_LIMITED',
       message: 'Zu viele Hub-Anfragen. Bitte später erneut versuchen.',
     });
+  });
+});
+
+describe('Hub OpenAPI contract', () => {
+  it('declares every unified activity query parameter', () => {
+    const specification = yaml.load(
+      readFileSync(path.join(process.cwd(), 'seerr-api.yml'), 'utf8')
+    ) as {
+      paths: Record<
+        string,
+        { get: { parameters: { in: string; name: string }[] } }
+      >;
+    };
+    const queryParameters = specification.paths['/hub/activity'].get.parameters
+      .filter((parameter) => parameter.in === 'query')
+      .map((parameter) => parameter.name);
+
+    assert.deepStrictEqual(queryParameters, [
+      'take',
+      'skip',
+      'kinds',
+      'formats',
+      'states',
+      'query',
+    ]);
   });
 });
