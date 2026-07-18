@@ -8369,10 +8369,9 @@ paths:
           schema: { type: string, maxLength: 200 }
       responses:
         '200':
-          {
-            description: Paginated unified activity with a permission-scoped,
-            sanitized Radarr and Sonarr download queue,
-          }
+          description: >-
+            Paginated unified activity with a permission-scoped, sanitized
+            Radarr and Sonarr download queue
   /hub/items/{kind}/{provider}/{externalId}:
     get:
       summary: Resolve canonical artist, album, work and edition details
