@@ -10,6 +10,19 @@ by those upstream projects. Published release notes must identify the exact
 source commit, upstream base, supported migration path, known limitations,
 container digest, and rollback requirements.
 
+## 0.7.0
+
+### Download progress
+
+- Added a permission-scoped Radarr and Sonarr download queue to the unified
+  requests page, including an overall byte-weighted progress bar.
+- Added visible progress per movie, episode and season pack with sanitized
+  status, remaining time, size totals and `SxxExx` episode labels.
+- Kept raw release filenames and download-client identifiers out of the public
+  activity API while preserving existing per-user request isolation.
+- Added unit, authorization and browser regression coverage for progress
+  calculation, duplicate season-pack grouping and the accessible queue UI.
+
 ## 0.6.3
 
 ### Requests loading

@@ -26,6 +26,12 @@ Hub API keys and webhook URLs are encrypted in `settings.json`; the matching
 `hub-secrets.key` decrypts them. Both files, database credentials, and all other
 application secrets remain sensitive and must be access-controlled together.
 
+Radarr and Sonarr queue data is held in memory for the download-progress view.
+The public activity response follows existing request permissions and omits raw
+release filenames and download-client identifiers. It contains requested
+titles, sanitized states, byte totals, remaining time, and episode numbers for
+downloads the current user is allowed to see.
+
 ## External Services
 
 An instance may communicate with:
