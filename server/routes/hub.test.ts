@@ -1554,6 +1554,114 @@ describe('Hub authorization and privacy', () => {
     );
   });
 
+  it('suppresses failed-history problems for imported, future, and processing episodes', async () => {
+    const request = await seedVideoRequest(
+      'friend@seerr.dev',
+      MediaType.TV,
+      1404
+    );
+    request.media.serviceId = 1;
+    request.media.externalServiceId = 91;
+    request.status = MediaRequestStatus.APPROVED;
+    request.seasons = [
+      new SeasonRequest({
+        seasonNumber: 1,
+        status: MediaRequestStatus.APPROVED,
+      }),
+    ];
+    await getRepository(Media).save(request.media);
+    await getRepository(MediaRequest).save(request);
+    for (const episodeNumber of [1, 2, 3, 4]) {
+      await recordAcquisitionIssue({
+        requestSource: 'seerr',
+        requestId: request.id,
+        kind: MediaType.TV,
+        externalId: '1404',
+        is4k: false,
+        partKey: `S01E0${episodeNumber}`,
+        reasonCode: 'download_failed',
+        requestedBy: request.requestedBy,
+      });
+    }
+    const importPending = {
+      mediaType: MediaType.TV,
+      externalId: 91,
+      size: 100,
+      sizeLeft: 0,
+      status: 'importPending',
+      timeLeft: '',
+      estimatedCompletionTime: new Date(),
+      title: '',
+      downloadId: 'pending-import',
+      source: 'sonarr' as const,
+      episode: {
+        seasonNumber: 1,
+        episodeNumber: 3,
+        absoluteEpisodeNumber: 3,
+        id: 3,
+      },
+    };
+    await persistServarrQueueIssues('sonarr', 1, [importPending]);
+    const history = [1, 2, 3, 4].map((episodeNumber) => ({
+      id: 20 + episodeNumber,
+      seriesId: 91,
+      episodeId: episodeNumber,
+      eventType: 'downloadFailed',
+      date: new Date().toISOString(),
+      episode: { seasonNumber: 1, episodeNumber },
+    }));
+    await persistServarrHistoryIssues(
+      'sonarr',
+      1,
+      history,
+      undefined,
+      new Map([
+        [
+          91,
+          [
+            {
+              seasonNumber: 1,
+              episodeNumber: 1,
+              hasFile: true,
+              airDateUtc: '2025-01-01T00:00:00Z',
+            },
+            {
+              seasonNumber: 1,
+              episodeNumber: 2,
+              hasFile: false,
+              airDateUtc: '2999-01-01T00:00:00Z',
+            },
+            {
+              seasonNumber: 1,
+              episodeNumber: 3,
+              hasFile: false,
+              airDateUtc: '2025-01-01T00:00:00Z',
+            },
+            {
+              seasonNumber: 1,
+              episodeNumber: 4,
+              hasFile: false,
+              airDateUtc: '2025-01-01T00:00:00Z',
+            },
+          ],
+        ],
+      ]),
+      [importPending]
+    );
+    const issues = await getRepository(HubAcquisitionIssue).findBy({
+      requestSource: 'seerr',
+      requestId: request.id,
+    });
+    assert.deepStrictEqual(
+      issues.filter((issue) => !issue.resolvedAt).map((issue) => issue.partKey),
+      ['S01E04']
+    );
+    assert.ok(
+      issues.find((issue) => issue.partKey === 'S01E03')?.resolvedAt,
+      'importPending remains represented by the queue instead of an error'
+    );
+  });
+
   it('records concurrent observations once and cleans orphaned issues', async () => {
     const videoRequest = await seedVideoRequest(
       'friend@seerr.dev',

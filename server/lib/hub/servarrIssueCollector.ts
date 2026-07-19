@@ -11,6 +11,7 @@ import {
 } from './acquisitionIssues';
 import {
   canonicalEpisodePartKey,
+  episodeForPartKey,
   normalizeAcquisitionPhase,
 } from './acquisitionStatus';
 
@@ -54,6 +55,16 @@ export const persistServarrQueueIssues = async (
     const failures = matching.filter(
       (item) => normalizeAcquisitionPhase(item).phase === 'failed'
     );
+    if (source === 'sonarr') {
+      for (const active of matching.filter(
+        (item) => normalizeAcquisitionPhase(item).phase !== 'failed'
+      )) {
+        const partKey = partKeyFor(active);
+        if (partKey) {
+          await resolveAcquisitionIssuePart('seerr', request.id, partKey);
+        }
+      }
+    }
     if (failures.length) {
       for (const failure of failures) {
         const normalized = normalizeAcquisitionPhase(failure);
@@ -76,7 +87,9 @@ export const persistServarrHistoryIssues = async (
   source: 'radarr' | 'sonarr',
   serverId: number,
   history: HistoryItem[],
-  loadedRequests?: MediaRequest[]
+  loadedRequests?: MediaRequest[],
+  episodeStates?: Map<number, ServarrEpisodeState[]>,
+  currentQueue: DownloadingItem[] = []
 ): Promise<void> => {
   const events = history.filter(
     (item) =>
@@ -129,6 +142,31 @@ export const persistServarrHistoryIssues = async (
         ) {
           continue;
         }
+        if (source === 'sonarr') {
+          const episode = episodeForPartKey(partKey);
+          const state = episodeStates
+            ?.get(externalId)
+            ?.find(
+              (candidate) =>
+                candidate.seasonNumber === episode?.seasonNumber &&
+                candidate.episodeNumber === episode?.episodeNumber
+            );
+          const airDate = state?.airDateUtc ?? state?.airDate;
+          const notAired = Boolean(
+            airDate && new Date(airDate).getTime() > Date.now()
+          );
+          const activelyProcessing = currentQueue.some(
+            (item) =>
+              item.mediaType === MediaType.TV &&
+              item.externalId === externalId &&
+              partKeyFor(item) === partKey &&
+              normalizeAcquisitionPhase(item).phase !== 'failed'
+          );
+          if (state?.hasFile || notAired || activelyProcessing) {
+            await resolveAcquisitionIssuePart('seerr', request.id, partKey);
+            continue;
+          }
+        }
         await recordAcquisitionIssue({
           requestSource: 'seerr',
           requestId: request.id,
@@ -146,6 +184,14 @@ export const persistServarrHistoryIssues = async (
     }
   }
 };
+
+export interface ServarrEpisodeState {
+  seasonNumber: number;
+  episodeNumber: number;
+  hasFile: boolean;
+  airDate?: string;
+  airDateUtc?: string;
+}
 
 export const findActiveServarrIssueRequests = async (): Promise<
   MediaRequest[]

@@ -1,5 +1,5 @@
 import RadarrAPI from '@server/api/servarr/radarr';
-import SonarrAPI from '@server/api/servarr/sonarr';
+import SonarrAPI, { type EpisodeResult } from '@server/api/servarr/sonarr';
 import { MediaType } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import { getSettings } from '@server/lib/settings';
@@ -81,6 +81,24 @@ interface SabQueueSlot {
   position: number;
   sizeLeft?: number;
 }
+
+const mapWithLimit = async <T, R>(
+  values: T[],
+  limit: number,
+  mapper: (value: T) => Promise<R>
+): Promise<R[]> => {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, values.length) }, async () => {
+      while (next < values.length) {
+        const index = next++;
+        results[index] = await mapper(values[index]);
+      }
+    })
+  );
+  return results;
+};
 
 const getSabQueue = async (): Promise<Map<string, SabQueueSlot>> => {
   const { url, apiKey } = integrationConfig('sabnzbd');
@@ -491,6 +509,43 @@ class DownloadTracker {
               sonarr.getRecentHistory(),
               sonarr.getSeries(),
             ]);
+            const requestedSeriesIds = new Set(
+              issueRequests.flatMap((request) => {
+                const requestServiceId =
+                  request.media[request.is4k ? 'serviceId4k' : 'serviceId'];
+                const requestExternalId =
+                  request.media[
+                    request.is4k ? 'externalServiceId4k' : 'externalServiceId'
+                  ];
+                return request.type === MediaType.TV &&
+                  requestServiceId != null &&
+                  mirroredServerIds.includes(requestServiceId) &&
+                  requestExternalId != null
+                  ? [requestExternalId]
+                  : [];
+              })
+            );
+            const failedSeriesIds = [
+              ...new Set(
+                history.flatMap((event) =>
+                  /fail/i.test(event.eventType) &&
+                  event.seriesId != null &&
+                  requestedSeriesIds.has(event.seriesId)
+                    ? [event.seriesId]
+                    : []
+                )
+              ),
+            ];
+            const episodeStates = new Map(
+              await mapWithLimit(
+                failedSeriesIds,
+                4,
+                async (seriesId): Promise<[number, EpisodeResult[]]> => [
+                  seriesId,
+                  await sonarr.getEpisodes(seriesId),
+                ]
+              )
+            );
 
             this.sonarrServers[server.id] = queueItems.map((item, index) => ({
               externalId: item.seriesId,
@@ -527,7 +582,9 @@ class DownloadTracker {
               'sonarr',
               server.id,
               history,
-              issueRequests
+              issueRequests,
+              episodeStates,
+              this.sonarrServers[server.id]
             );
             this.sonarrCatalog[server.id] = Object.fromEntries(
               series
