@@ -267,6 +267,10 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
       );
     }
   }
+
+  public async retryMovieSearch(movieId: number): Promise<void> {
+    await this.runCommand('MoviesSearch', { movieIds: [movieId] });
+  }
   public removeMovie = async (movieId: number): Promise<void> => {
     try {
       const { id, title } = await this.getMovieByTmdbId(movieId);

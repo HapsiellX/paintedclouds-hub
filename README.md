@@ -25,6 +25,8 @@ V0.6 is the first stable release under the StefARR identity. Read the
 [branding, compatibility, and upgrade notes](docs/v0.6-stefarr-rebrand.md).
 The Radarr and Sonarr queue visualization added in V0.7 is documented in the
 [download-progress and privacy notes](docs/v0.7-download-progress.md).
+The truthful acquisition lifecycle introduced in V0.8 is documented in the
+[queue, failure-retention, and upgrade notes](docs/v0.8-acquisition-status.md).
 The current-media discovery behavior introduced in V0.5 is documented in the
 [music-source, recency, streaming, and upgrade notes](docs/v0.5-current-discovery.md)
 and the underlying

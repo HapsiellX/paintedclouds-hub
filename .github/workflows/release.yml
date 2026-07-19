@@ -216,6 +216,12 @@ jobs:
 
           Back up the configuration directory and database before upgrading.
           EOF
+          if git cat-file -e "$CANDIDATE_SHA:RELEASE_NOTES.md" 2>/dev/null; then
+            {
+              printf '\n'
+              git show "$CANDIDATE_SHA:RELEASE_NOTES.md"
+            } >> "$RUNNER_TEMP/release-notes.md"
+          fi
           release_flags=()
           if [[ "$IS_PRERELEASE" == true ]]; then
             release_flags+=(--prerelease)

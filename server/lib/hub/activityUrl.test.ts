@@ -13,12 +13,13 @@ describe('buildHubActivityUrl', () => {
         formats: '',
         states: '',
         query: '',
+        scanCursor: undefined,
       }),
       '/api/v1/hub/activity?take=20&skip=0'
     );
   });
 
-  it('includes and encodes only active filters', () => {
+  it('includes and encodes the backend pagination state and active filters', () => {
     assert.equal(
       buildHubActivityUrl({
         take: 20,
@@ -27,8 +28,9 @@ describe('buildHubActivityUrl', () => {
         formats: 'ebook,audiobook',
         states: 'pending',
         query: 'Der Name & mehr',
+        scanCursor: 200,
       }),
-      '/api/v1/hub/activity?take=20&skip=40&kinds=book&formats=ebook%2Caudiobook&states=pending&query=Der+Name+%26+mehr'
+      '/api/v1/hub/activity?take=20&skip=40&kinds=book&formats=ebook%2Caudiobook&states=pending&query=Der+Name+%26+mehr&scanCursor=200'
     );
   });
 });

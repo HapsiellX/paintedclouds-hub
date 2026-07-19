@@ -9,6 +9,8 @@ import {
   searchHubCatalog,
   searchHubMusicArtists,
 } from '@server/api/hub/catalog';
+import RadarrAPI from '@server/api/servarr/radarr';
+import SonarrAPI from '@server/api/servarr/sonarr';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   HubMediaKind,
@@ -21,6 +23,7 @@ import {
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import { HubAcquisitionIssue } from '@server/entity/HubAcquisitionIssue';
 import { HubAuditEvent } from '@server/entity/HubAuditEvent';
 import { HubRequest } from '@server/entity/HubRequest';
 import { HubUserProfile } from '@server/entity/HubUserProfile';
@@ -28,7 +31,22 @@ import { HubUserSignal } from '@server/entity/HubUserSignal';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
+import downloadTracker from '@server/lib/downloadtracker';
 import { submitHubRequest } from '@server/lib/hub/acquisition';
+import { collectHubRequestAcquisition } from '@server/lib/hub/acquisitionCollectors';
+import {
+  findAcquisitionIssues,
+  findRecentResolvedAcquisitionIssues,
+  recordAcquisitionIssue,
+  resolveAcquisitionIssues,
+  visibleAcquisitionIssueWhere,
+} from '@server/lib/hub/acquisitionIssues';
+import {
+  acquisitionIssueDto,
+  canonicalEpisodePartKey,
+  summarizeHubAcquisition,
+  type HubAcquisition,
+} from '@server/lib/hub/acquisitionStatus';
 import { withHubMetadataCache } from '@server/lib/hub/cache';
 import { summarizeHubDownloads } from '@server/lib/hub/downloadProgress';
 import {
@@ -68,6 +86,7 @@ import logger from '@server/logger';
 import { createHash } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
+import { In, IsNull } from 'typeorm';
 import { z } from 'zod';
 
 const hubRoutes = Router();
@@ -157,6 +176,7 @@ const listSchema = z.object({
   formats: z.string().max(100).optional(),
   states: z.string().max(300).optional(),
   query: z.string().trim().max(200).optional(),
+  scanCursor: z.coerce.number().int().min(0).default(0),
 });
 
 const idSchema = z.coerce.number().int().positive();
@@ -887,10 +907,15 @@ hubRoutes.get('/requests/:id/history', hubReadLimiter, async (req, res) => {
   if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
   const user = req.user as User;
   const admin = user.hasPermission(Permission.ADMIN);
+  const canViewAll = user.hasPermission(
+    [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+    { type: 'or' }
+  );
   const hubRequest = await getRepository(HubRequest).findOne({
-    where: admin
-      ? { id: id.data }
-      : { id: id.data, requestedBy: { id: user.id } },
+    where:
+      admin || canViewAll
+        ? { id: id.data }
+        : { id: id.data, requestedBy: { id: user.id } },
   });
   if (!hubRequest) return res.sendStatus(404);
   const events = await getRepository(HubAuditEvent).find({
@@ -955,19 +980,111 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       ) ?? []
   );
   const activityQuery = parsed.data.query?.toLocaleLowerCase();
-  const sourceLimit = Math.min(100, parsed.data.skip + take * 2);
-  const [hubRequests, videoRequests] = await Promise.all([
+  const sourceLimit = parsed.data.skip + take * 2;
+  const filteredActivity = Boolean(
+    requestedKinds.size ||
+    requestedStates.size ||
+    requestedFormats.size ||
+    activityQuery
+  );
+  const pageScanLimit = filteredActivity
+    ? Math.min(500, sourceLimit + take * 5)
+    : sourceLimit;
+  const [
+    pageHubRequests,
+    pageVideoRequests,
+    activeHubRequests,
+    activeVideoRequests,
+  ] = await Promise.all([
     getRepository(HubRequest).find({
       where: canViewAll ? {} : { requestedBy: { id: user.id } },
       order: { createdAt: 'DESC' },
-      take: sourceLimit,
+      take: pageScanLimit,
+      ...(filteredActivity && parsed.data.scanCursor
+        ? { skip: parsed.data.scanCursor }
+        : {}),
     }),
     getRepository(MediaRequest).find({
       where: canViewAll ? {} : { requestedBy: { id: user.id } },
       order: { createdAt: 'DESC' },
-      take: sourceLimit,
+      take: pageScanLimit,
+      ...(filteredActivity && parsed.data.scanCursor
+        ? { skip: parsed.data.scanCursor }
+        : {}),
+    }),
+    getRepository(HubRequest).find({
+      where: {
+        ...(canViewAll ? {} : { requestedBy: { id: user.id } }),
+        state: In([
+          HubRequestState.SUBMITTED,
+          HubRequestState.DOWNLOADING,
+          HubRequestState.IMPORTED,
+          HubRequestState.FAILED,
+        ]),
+      },
+    }),
+    getRepository(MediaRequest).find({
+      where: {
+        ...(canViewAll ? {} : { requestedBy: { id: user.id } }),
+        status: In([MediaRequestStatus.APPROVED, MediaRequestStatus.FAILED]),
+      },
     }),
   ]);
+  let hubRequests = [
+    ...new Map(
+      [...pageHubRequests, ...activeHubRequests].map((request) => [
+        request.id,
+        request,
+      ])
+    ).values(),
+  ];
+  let videoRequests = [
+    ...new Map(
+      [...pageVideoRequests, ...activeVideoRequests].map((request) => [
+        request.id,
+        request,
+      ])
+    ).values(),
+  ];
+  const [issues, recentResolvedIssues] = await Promise.all([
+    findAcquisitionIssues(user),
+    findRecentResolvedAcquisitionIssues(user),
+  ]);
+  const allIssueRequests = [...issues, ...recentResolvedIssues];
+  const missingHubIds = allIssueRequests
+    .filter(
+      (issue) =>
+        issue.requestSource === 'hub' &&
+        !hubRequests.some((request) => request.id === issue.requestId)
+    )
+    .map((issue) => issue.requestId);
+  const missingVideoIds = allIssueRequests
+    .filter(
+      (issue) =>
+        issue.requestSource === 'seerr' &&
+        !videoRequests.some((request) => request.id === issue.requestId)
+    )
+    .map((issue) => issue.requestId);
+  const [issueHubRequests, issueVideoRequests] = await Promise.all([
+    missingHubIds.length
+      ? getRepository(HubRequest).findBy({ id: In(missingHubIds) })
+      : [],
+    missingVideoIds.length
+      ? getRepository(MediaRequest).findBy({ id: In(missingVideoIds) })
+      : [],
+  ]);
+  hubRequests = [...hubRequests, ...issueHubRequests];
+  videoRequests = [...videoRequests, ...issueVideoRequests];
+  const pageItemIds = new Set([
+    ...pageHubRequests.map((request) => `hub:${request.id}`),
+    ...pageVideoRequests.map((request) => `video:${request.id}`),
+  ]);
+  const issuesByRequest = new Map<string, HubAcquisitionIssue[]>();
+  issues.forEach((issue) => {
+    const key = `${issue.requestSource}:${issue.requestId}:${issue.is4k}`;
+    issuesByRequest.set(key, [...(issuesByRequest.get(key) ?? []), issue]);
+  });
+  const trackerStatus = downloadTracker.getStatus();
   const tmdb = new TheMovieDb();
   const video = await mapWithConcurrency(videoRequests, 8, async (request) => {
     const detail = await (
@@ -978,10 +1095,190 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
           })
         : tmdb.getTvShow({ tvId: request.media.tmdbId, language: req.locale })
     ).catch(() => undefined);
-    const downloadProgress = summarizeHubDownloads(
-      request.media[request.is4k ? 'downloadStatus4k' : 'downloadStatus']
+    const requestedSeasons = new Set(
+      request.seasons.map((season) => season.seasonNumber)
     );
+    const rawDownloads =
+      request.media[request.is4k ? 'downloadStatus4k' : 'downloadStatus'] ?? [];
+    const requestDownloads =
+      request.type === MediaType.TV
+        ? rawDownloads.filter(
+            (item) =>
+              item.episode && requestedSeasons.has(item.episode.seasonNumber)
+          )
+        : rawDownloads;
+    const downloadProgress = summarizeHubDownloads(requestDownloads);
     const mediaStatus = request.media[request.is4k ? 'status4k' : 'status'];
+    const serviceId = request.media[request.is4k ? 'serviceId4k' : 'serviceId'];
+    const externalServiceId =
+      request.media[request.is4k ? 'externalServiceId4k' : 'externalServiceId'];
+    const fullVideoSnapshot =
+      serviceId != null && externalServiceId != null
+        ? downloadTracker.getVideoSnapshot(
+            request.type,
+            serviceId,
+            externalServiceId
+          )
+        : undefined;
+    const trackerProvider =
+      request.type === MediaType.MOVIE
+        ? ('radarr' as const)
+        : ('sonarr' as const);
+    const relevantTrackerStale = trackerStatus.serverStale
+      ? (trackerStatus.serverStale[trackerProvider]?.[serviceId ?? -1] ?? true)
+      : trackerStatus.providerStale
+        ? trackerStatus.providerStale[trackerProvider]
+        : trackerStatus.stale || !trackerStatus.providers[trackerProvider];
+    const relevantLastSuccessfulSyncAt =
+      trackerStatus.serverLastSuccessfulSyncAt?.[trackerProvider]?.[
+        serviceId ?? -1
+      ] ??
+      trackerStatus.providerLastSuccessfulSyncAt?.[trackerProvider] ??
+      trackerStatus.lastSuccessfulSyncAt;
+    const videoSnapshot =
+      request.type === MediaType.TV && fullVideoSnapshot?.seasons
+        ? (() => {
+            const selected = [...requestedSeasons]
+              .map((seasonNumber) => fullVideoSnapshot.seasons?.[seasonNumber])
+              .filter(
+                (
+                  season
+                ): season is {
+                  requested: number;
+                  imported: number;
+                  queued: number;
+                  failed: number;
+                } => Boolean(season)
+              );
+            const requested = selected.reduce(
+              (sum, season) => sum + season.requested,
+              0
+            );
+            const imported = selected.reduce(
+              (sum, season) => sum + season.imported,
+              0
+            );
+            return {
+              availability:
+                requested > 0 && imported >= requested
+                  ? ('imported' as const)
+                  : imported > 0
+                    ? ('partial' as const)
+                    : ('missing' as const),
+              waitingForRelease: false,
+              requested,
+              imported,
+              queued: selected.reduce((sum, season) => sum + season.queued, 0),
+              failed: selected.reduce((sum, season) => sum + season.failed, 0),
+            };
+          })()
+        : fullVideoSnapshot;
+    const linkedTrackerUnavailable = Boolean(
+      serviceId != null &&
+      externalServiceId != null &&
+      relevantTrackerStale &&
+      !fullVideoSnapshot &&
+      requestDownloads.length === 0
+    );
+    const availability =
+      mediaStatus === MediaStatus.AVAILABLE
+        ? ('available' as const)
+        : mediaStatus === MediaStatus.PARTIALLY_AVAILABLE
+          ? ('partial' as const)
+          : request.status === MediaRequestStatus.COMPLETED
+            ? ('imported' as const)
+            : (videoSnapshot?.availability ?? ('missing' as const));
+    const releaseDate =
+      detail && 'release_date' in detail ? detail.release_date : undefined;
+    const waitingForRelease =
+      videoSnapshot?.waitingForRelease ??
+      (request.type === MediaType.MOVIE &&
+        Boolean(releaseDate && new Date(releaseDate).getTime() > Date.now()));
+    const issueKey = `seerr:${request.id}:${request.is4k}`;
+    let issue = issuesByRequest.get(issueKey)?.[0];
+    let acquisition = summarizeHubAcquisition({
+      downloads: requestDownloads,
+      availability,
+      fallbackPhase:
+        availability === 'available'
+          ? 'available'
+          : availability === 'partial'
+            ? 'partially_available'
+            : availability === 'imported'
+              ? 'import_pending'
+              : linkedTrackerUnavailable
+                ? 'unknown'
+                : waitingForRelease
+                  ? 'waiting_for_release'
+                  : 'searching',
+      updatedAt: relevantLastSuccessfulSyncAt
+        ? new Date(relevantLastSuccessfulSyncAt)
+        : request.updatedAt,
+      stale:
+        relevantTrackerStale &&
+        Boolean(serviceId != null && externalServiceId != null),
+      counts: videoSnapshot
+        ? {
+            requested: videoSnapshot.requested,
+            queued: videoSnapshot.queued,
+            imported: videoSnapshot.imported,
+            failed: videoSnapshot.failed,
+          }
+        : undefined,
+    });
+    if (
+      (request.status === MediaRequestStatus.FAILED ||
+        acquisition.phase === 'failed') &&
+      !issue
+    ) {
+      const failedPart = acquisition.parts.find(
+        (part) => part.phase === 'failed'
+      );
+      const partKeys = failedPart?.episodes.length
+        ? failedPart.episodes.map((episode) =>
+            canonicalEpisodePartKey(episode.seasonNumber, episode.episodeNumber)
+          )
+        : [''];
+      const recordedIssues = await Promise.all(
+        partKeys.map((partKey) =>
+          recordAcquisitionIssue({
+            requestSource: 'seerr',
+            requestId: request.id,
+            kind: request.type,
+            externalId: String(request.media.tmdbId),
+            is4k: request.is4k,
+            reasonCode:
+              failedPart?.reasonCode ??
+              (request.status === MediaRequestStatus.FAILED
+                ? 'submission_failed'
+                : 'download_failed'),
+            partKey,
+            requestedBy: request.requestedBy,
+          })
+        )
+      );
+      issue = recordedIssues[0];
+      issuesByRequest.set(issueKey, [
+        ...(issuesByRequest.get(issueKey) ?? []),
+        ...recordedIssues,
+      ]);
+      acquisition = { ...acquisition, issue: acquisitionIssueDto(issue) };
+    } else if (
+      issue &&
+      acquisition.phase !== 'failed' &&
+      (availability === 'available' || availability === 'imported')
+    ) {
+      await resolveAcquisitionIssues('seerr', request.id);
+      issuesByRequest.delete(issueKey);
+      acquisition = { ...acquisition, issue: undefined };
+    } else if (issue) {
+      acquisition = {
+        ...acquisition,
+        phase: 'failed',
+        health: 'error',
+        issue: acquisitionIssueDto(issue),
+      };
+    }
     const state =
       request.status === MediaRequestStatus.PENDING
         ? HubRequestState.PENDING
@@ -1021,16 +1318,66 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       },
       createdAt: request.createdAt,
       updatedAt: request.updatedAt,
+      acquisition,
       ...(downloadProgress ? { downloadProgress } : {}),
     };
   });
-  const hub = hubRequests.map((request) => ({
-    ...toHubRequestDto(request, { admin }),
-    id: `hub:${request.id}`,
-    source: 'hub' as const,
-    sourceId: request.id,
-  }));
+  const hub = await mapWithConcurrency(hubRequests, 8, async (request) => {
+    const issueKey = `hub:${request.id}:false`;
+    let issue = issuesByRequest.get(issueKey)?.[0];
+    if (request.state === HubRequestState.FAILED && !issue) {
+      issue = await recordAcquisitionIssue({
+        requestSource: 'hub',
+        requestId: request.id,
+        kind: request.kind,
+        externalId: request.externalId,
+        is4k: false,
+        reasonCode: 'submission_failed',
+        requestedBy: request.requestedBy,
+      });
+      issuesByRequest.set(issueKey, [
+        ...(issuesByRequest.get(issueKey) ?? []),
+        issue,
+      ]);
+    }
+    let acquisition = await collectHubRequestAcquisition(request, issue);
+    if (acquisition.phase === 'failed' && !issue) {
+      issue = await recordAcquisitionIssue({
+        requestSource: 'hub',
+        requestId: request.id,
+        kind: request.kind,
+        externalId: request.externalId,
+        is4k: false,
+        reasonCode:
+          request.state === HubRequestState.FAILED
+            ? 'submission_failed'
+            : 'provider_failed',
+        requestedBy: request.requestedBy,
+      });
+      issuesByRequest.set(issueKey, [
+        ...(issuesByRequest.get(issueKey) ?? []),
+        issue,
+      ]);
+      acquisition = { ...acquisition, issue: acquisitionIssueDto(issue) };
+    } else if (
+      issue &&
+      (acquisition.availability === 'available' ||
+        acquisition.availability === 'imported')
+    ) {
+      await resolveAcquisitionIssues('hub', request.id);
+      issuesByRequest.delete(issueKey);
+      acquisition = { ...acquisition, issue: undefined };
+    }
+    return {
+      ...toHubRequestDto(request, { admin }),
+      id: `hub:${request.id}`,
+      source: 'hub' as const,
+      sourceId: request.id,
+      acquisition,
+    };
+  });
   const filtered = [...hub, ...video]
+    .filter((item) => pageItemIds.has(item.id))
     .filter((item) => !requestedKinds.size || requestedKinds.has(item.kind))
     .filter(
       (item) =>
@@ -1050,7 +1397,23 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  const results = filtered.slice(parsed.data.skip, parsed.data.skip + take);
+  const resultSkip = parsed.data.skip;
+  const results = filtered.slice(resultSkip, resultSkip + take);
+  const scanExhausted =
+    filteredActivity &&
+    (pageHubRequests.length >= pageScanLimit ||
+      pageVideoRequests.length >= pageScanLimit);
+  const hasMoreInWindow = resultSkip + results.length < filtered.length;
+  const nextScanCursor = hasMoreInWindow
+    ? parsed.data.scanCursor
+    : scanExhausted
+      ? parsed.data.scanCursor + pageScanLimit
+      : undefined;
+  const nextSkip = hasMoreInWindow
+    ? resultSkip + results.length
+    : scanExhausted
+      ? 0
+      : undefined;
   const queue = [
     ...new Map(
       video
@@ -1069,13 +1432,186 @@ hubRoutes.get('/activity', hubReadLimiter, async (req, res) => {
         ])
     ).values(),
   ];
+  type AcquisitionQueueItem = {
+    id: string;
+    kind: HubMediaKind | MediaType;
+    externalId: string;
+    title: string;
+    imageUrl?: string;
+    is4k?: boolean;
+    acquisition: HubAcquisition;
+  };
+  const acquisitionItems: AcquisitionQueueItem[] = [...video, ...hub]
+    .filter((item) =>
+      [
+        'queued',
+        'downloading',
+        'paused',
+        'repairing',
+        'verifying',
+        'extracting',
+        'import_pending',
+        'importing',
+        'failed',
+        'waiting_for_release',
+        'searching',
+        'partially_available',
+        'unknown',
+      ].includes(item.acquisition.phase)
+    )
+    .map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      externalId: item.externalId,
+      title: item.title,
+      ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
+      ...('is4k' in item ? { is4k: item.is4k } : {}),
+      acquisition: item.acquisition,
+    }));
+  type AcquisitionGroup =
+    | 'downloading'
+    | 'queued'
+    | 'processing'
+    | 'paused'
+    | 'problems';
+  const acquisitionGroupFor = (
+    acquisition: HubAcquisition
+  ): AcquisitionGroup => {
+    if (acquisition.phase === 'failed' || acquisition.health === 'error') {
+      return 'problems';
+    }
+    if (acquisition.phase === 'paused') return 'paused';
+    if (
+      acquisition.phase === 'unknown' ||
+      acquisition.health === 'warning' ||
+      acquisition.health === 'stale' ||
+      acquisition.stale
+    ) {
+      return 'problems';
+    }
+    if (
+      [
+        'repairing',
+        'verifying',
+        'extracting',
+        'import_pending',
+        'importing',
+      ].includes(acquisition.phase)
+    ) {
+      return 'processing';
+    }
+    if (acquisition.phase === 'downloading') return 'downloading';
+    return 'queued';
+  };
+  const grouped = (wanted: AcquisitionGroup) =>
+    acquisitionItems.filter(
+      (item) => acquisitionGroupFor(item.acquisition) === wanted
+    );
+  const totalBytes = acquisitionItems.reduce(
+    (sum, item) => sum + item.acquisition.totalBytes,
+    0
+  );
+  const downloadedBytes = acquisitionItems.reduce(
+    (sum, item) => sum + item.acquisition.downloadedBytes,
+    0
+  );
+  const problems = grouped('problems');
+  const issueItems = acquisitionItems.flatMap((item) => {
+    const source = item.id.startsWith('video:') ? 'seerr' : 'hub';
+    const requestId = Number(item.id.split(':')[1]);
+    return (
+      issuesByRequest.get(`${source}:${requestId}:${item.is4k ?? false}`) ?? []
+    ).map((issue) => ({
+      ...item,
+      id: `${item.id}:issue:${issue.id}`,
+      acquisition: {
+        ...item.acquisition,
+        phase: 'failed' as const,
+        health: 'error' as const,
+        issue: acquisitionIssueDto(issue),
+      },
+    }));
+  });
+  const issueRequestIds = new Set(
+    issueItems.map((item) => item.id.split(':issue:')[0])
+  );
+  const problemItems = [
+    ...issueItems,
+    ...problems.filter((item) => !issueRequestIds.has(item.id)),
+  ];
+  const requestDetails = new Map(
+    [...video, ...hub].map((item) => [
+      `${item.source}:${item.sourceId}`,
+      { title: item.title, kind: item.kind },
+    ])
+  );
+  const recentIssues = recentResolvedIssues.flatMap((issue) => {
+    const details = requestDetails.get(
+      `${issue.requestSource}:${issue.requestId}`
+    );
+    if (!details || !issue.resolvedAt) return [];
+    return [
+      {
+        source: issue.requestSource,
+        requestId: issue.requestId,
+        title: details.title,
+        kind: details.kind,
+        reasonCode: issue.reasonCode,
+        message: issue.message,
+        resolvedAt: issue.resolvedAt.toISOString(),
+        acknowledged: Boolean(issue.acknowledgedAt),
+      },
+    ];
+  });
+  const processing = grouped('processing');
+  const queued = grouped('queued');
+  const downloading = grouped('downloading');
+  const paused = grouped('paused');
+  const acquisitionQueue = {
+    summary: {
+      total: acquisitionItems.length,
+      queued: queued.length,
+      downloading: downloading.length,
+      processing: processing.length,
+      paused: paused.length,
+      failed: problemItems.length,
+      waitingForRelease: acquisitionItems.filter(
+        (item) => item.acquisition.phase === 'waiting_for_release'
+      ).length,
+      importPending: acquisitionItems.filter(
+        (item) => item.acquisition.phase === 'import_pending'
+      ).length,
+      progress: totalBytes
+        ? Math.round((downloadedBytes / totalBytes) * 100)
+        : 0,
+      downloadedBytes,
+      totalBytes,
+    },
+    groups: {
+      downloading,
+      queued,
+      paused,
+      processing,
+      problems: problemItems,
+    },
+    issues: problemItems,
+    recentIssues,
+    observedAt: new Date().toISOString(),
+    lastUpdatedAt: trackerStatus.lastSuccessfulSyncAt,
+    stale: trackerStatus.stale,
+  };
   return res.json({
     results,
     queue,
+    acquisitionQueue,
     take,
     skip: parsed.data.skip,
     total: filtered.length,
-    hasMore: parsed.data.skip + results.length < filtered.length,
+    totalIsEstimate: filteredActivity,
+    scanExhausted,
+    nextScanCursor,
+    nextSkip,
+    hasMore: hasMoreInWindow || scanExhausted,
   });
 });
 
@@ -1284,6 +1820,174 @@ hubRoutes.post(
 );
 
 hubRoutes.post(
+  '/acquisition/issues/:id/acknowledge',
+  hubManagementLimiter,
+  async (req, res) => {
+    const actor = req.user as User;
+    if (
+      !actor.hasPermission([Permission.ADMIN, Permission.MANAGE_REQUESTS], {
+        type: 'or',
+      })
+    ) {
+      return res.sendStatus(403);
+    }
+    const id = idSchema.safeParse(req.params.id);
+    if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
+    const repository = getRepository(HubAcquisitionIssue);
+    const visibleWhere = visibleAcquisitionIssueWhere(actor);
+    const acknowledged = await repository.update(
+      { id: id.data, ...visibleWhere, resolvedAt: IsNull() },
+      { acknowledgedAt: new Date() }
+    );
+    if (acknowledged.affected !== 1) return res.sendStatus(404);
+    const issue = await repository.findOneOrFail({
+      where: { id: id.data, ...visibleWhere },
+    });
+    return res.json(acquisitionIssueDto(issue));
+  }
+);
+
+hubRoutes.post(
+  '/acquisition/issues/:id/retry',
+  hubManagementLimiter,
+  async (req, res) => {
+    const actor = req.user as User;
+    const canManage = actor.hasPermission(
+      [Permission.ADMIN, Permission.MANAGE_REQUESTS],
+      { type: 'or' }
+    );
+    if (!canManage) return res.sendStatus(403);
+    const id = idSchema.safeParse(req.params.id);
+    if (!id.success) return res.status(400).json({ message: 'Ungültige ID.' });
+    const repository = getRepository(HubAcquisitionIssue);
+    const issue = await repository.findOne({
+      where: {
+        id: id.data,
+        ...visibleAcquisitionIssueWhere(actor),
+      },
+    });
+    if (!issue) return res.sendStatus(404);
+    if (issue.resolvedAt) {
+      return res.status(409).json({
+        message: 'Dieses Providerproblem wird bereits wiederholt.',
+      });
+    }
+    if (!issue.retryable) {
+      return res.status(409).json({
+        message:
+          'Dieses Providerproblem kann nicht automatisch wiederholt werden.',
+      });
+    }
+    const previousAcknowledgedAt = issue.acknowledgedAt ?? null;
+    const claimedAt = new Date();
+    const claimed = await repository.update(
+      { id: issue.id, resolvedAt: IsNull() },
+      { resolvedAt: claimedAt }
+    );
+    if (claimed.affected !== 1) {
+      return res.status(409).json({
+        message: 'Dieses Providerproblem wird bereits wiederholt.',
+      });
+    }
+    try {
+      if (issue.requestSource === 'hub') {
+        const requestRepository = getRepository(HubRequest);
+        let request = await requestRepository.findOneByOrFail({
+          id: issue.requestId,
+          state: HubRequestState.FAILED,
+        });
+        request.state = HubRequestState.PROCESSING;
+        request.errorMessage = null;
+        request = await requestRepository.save(request);
+        request = await requestRepository.save(await submitHubRequest(request));
+        await addAudit(request, 'retried', actor);
+      } else {
+        const requestRepository = getRepository(MediaRequest);
+        const request = await requestRepository.findOneByOrFail({
+          id: issue.requestId,
+        });
+        if (request.status === MediaRequestStatus.FAILED) {
+          request.status = MediaRequestStatus.APPROVED;
+          request.modifiedBy = actor;
+          await requestRepository.save(request);
+        } else if (
+          request.status === MediaRequestStatus.APPROVED ||
+          request.status === MediaRequestStatus.COMPLETED
+        ) {
+          const serviceId =
+            request.media[request.is4k ? 'serviceId4k' : 'serviceId'];
+          const externalServiceId =
+            request.media[
+              request.is4k ? 'externalServiceId4k' : 'externalServiceId'
+            ];
+          if (serviceId == null || externalServiceId == null) throw new Error();
+          if (request.type === MediaType.MOVIE) {
+            const server = getSettings().radarr.find(
+              (candidate) => candidate.id === serviceId
+            );
+            if (!server) throw new Error();
+            await new RadarrAPI({
+              apiKey: server.apiKey,
+              url: RadarrAPI.buildUrl(server, '/api/v3'),
+            }).retryMovieSearch(externalServiceId);
+          } else {
+            const server = getSettings().sonarr.find(
+              (candidate) => candidate.id === serviceId
+            );
+            if (!server) throw new Error();
+            const sonarr = new SonarrAPI({
+              apiKey: server.apiKey,
+              url: SonarrAPI.buildUrl(server, '/api/v3'),
+            });
+            const episode = /^S(\d+)E(\d+)$/.exec(issue.partKey);
+            if (episode) {
+              await sonarr.retryEpisodeSearch(
+                externalServiceId,
+                Number(episode[1]),
+                Number(episode[2])
+              );
+            } else {
+              await sonarr.retrySeriesSearch(externalServiceId);
+            }
+          }
+        } else {
+          throw new Error();
+        }
+      }
+      await repository.update(
+        { id: issue.id },
+        { acknowledgedAt: previousAcknowledgedAt ?? claimedAt }
+      );
+      const resolvedIssue = await repository.findOneByOrFail({ id: issue.id });
+      return res.json(acquisitionIssueDto(resolvedIssue));
+    } catch {
+      await repository.update(
+        { id: issue.id },
+        { resolvedAt: null, acknowledgedAt: previousAcknowledgedAt }
+      );
+      if (issue.requestSource === 'hub') {
+        const requestRepository = getRepository(HubRequest);
+        const failedRequest = await requestRepository.findOneBy({
+          id: issue.requestId,
+        });
+        if (failedRequest) {
+          failedRequest.state = HubRequestState.FAILED;
+          failedRequest.errorMessage = HUB_SUBMISSION_FAILED_MESSAGE;
+          await requestRepository.save(failedRequest);
+          await addAudit(failedRequest, 'retry_failed', actor, {
+            message: HUB_SUBMISSION_FAILED_MESSAGE,
+          });
+        }
+      }
+      return res.status(409).json({
+        message:
+          'Der fehlgeschlagene Download konnte nicht erneut gestartet werden.',
+      });
+    }
+  }
+);
+
+hubRoutes.post(
   '/requests/:id/retry',
   hubManagementLimiter,
   async (req, res) => {
@@ -1305,6 +2009,7 @@ hubRoutes.post(
     try {
       request = await repository.save(await submitHubRequest(request));
       await addAudit(request, 'retried', actor);
+      await resolveAcquisitionIssues('hub', request.id);
     } catch {
       request.state = HubRequestState.FAILED;
       request.errorMessage = HUB_SUBMISSION_FAILED_MESSAGE;

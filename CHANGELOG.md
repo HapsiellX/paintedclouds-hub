@@ -10,6 +10,22 @@ by those upstream projects. Published release notes must identify the exact
 source commit, upstream base, supported migration path, known limitations,
 container digest, and rollback requirements.
 
+## 0.8.0-beta.1
+
+### Truthful acquisition lifecycle
+
+- Separated request approval, acquisition work, and library availability so a
+  vanished queue record is never treated as proof of a successful import.
+- Added normalized waiting, transfer, post-processing, importing, partial,
+  available, stale, warning, and failed states across the configured media
+  backends without exposing release names or download-client identifiers.
+- Added persistent, permission-scoped acquisition issues that remain visible
+  until resolved and for seven days afterward, with authorized retry and
+  acknowledgement actions.
+- Reworked the unified requests page into active, queued, post-processing,
+  paused, and problem groups with honest episode/file counts and accessible
+  status announcements.
+
 ## 0.7.0
 
 ### Download progress
