@@ -68,4 +68,19 @@ describe('PaintedClouds Hub V0.1 settings import', () => {
     );
     assert.deepEqual(migrateV02(structuredClone(migrated)), migrated);
   });
+
+  it('adds a disabled fail-closed torrent fallback to existing settings', async () => {
+    const migrate = (
+      await import('@server/lib/settings/migrations/0011_add_torrent_fallback')
+    ).default;
+    const input = {
+      migrations: [],
+      hub: { configurationVersion: 3 },
+    } as never;
+    const migrated = migrate(input);
+    assert.equal(migrated.hub.configurationVersion, 4);
+    assert.equal(migrated.hub.torrentFallback.enabled, false);
+    assert.deepEqual(migrated.hub.torrentFallback.allowedExitCountries, ['DK']);
+    assert.deepEqual(migrate(structuredClone(migrated)), migrated);
+  });
 });

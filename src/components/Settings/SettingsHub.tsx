@@ -16,6 +16,14 @@ interface HubSettingsResponse {
   lazyLibrarian: { url: string; apiKeyConfigured: boolean };
   prowlarr: { url: string; apiKeyConfigured: boolean };
   sabnzbd: { url: string; apiKeyConfigured: boolean };
+  torrentFallback: {
+    enabled: boolean;
+    vpnGateUrl: string;
+    apiKeyConfigured: boolean;
+    allowedExitCountries: string[];
+    minSeeders: number;
+    retryCooldownMinutes: number;
+  };
   homeAssistant: { webhookUrlConfigured: boolean };
   metadata: { contactEmail: string; userAgent: string };
   defaults: { languages: string[]; bookFormats: ('ebook' | 'audiobook')[] };
@@ -40,11 +48,13 @@ const SettingsHub = () => {
   const [lazyKey, setLazyKey] = useState('');
   const [prowlarrKey, setProwlarrKey] = useState('');
   const [sabnzbdKey, setSabnzbdKey] = useState('');
+  const [torrentFallbackKey, setTorrentFallbackKey] = useState('');
   const [webhook, setWebhook] = useState('');
   const [clearLidarrKey, setClearLidarrKey] = useState(false);
   const [clearLazyKey, setClearLazyKey] = useState(false);
   const [clearProwlarrKey, setClearProwlarrKey] = useState(false);
   const [clearSabnzbdKey, setClearSabnzbdKey] = useState(false);
+  const [clearTorrentFallbackKey, setClearTorrentFallbackKey] = useState(false);
   const [clearWebhook, setClearWebhook] = useState(false);
   const [message, setMessage] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -91,6 +101,15 @@ const SettingsHub = () => {
           ...(sabnzbdKey ? { apiKey: sabnzbdKey } : {}),
           ...(clearSabnzbdKey ? { clearApiKey: true } : {}),
         },
+        torrentFallback: {
+          enabled: form.torrentFallback.enabled,
+          vpnGateUrl: form.torrentFallback.vpnGateUrl,
+          allowedExitCountries: form.torrentFallback.allowedExitCountries,
+          minSeeders: form.torrentFallback.minSeeders,
+          retryCooldownMinutes: form.torrentFallback.retryCooldownMinutes,
+          ...(torrentFallbackKey ? { apiKey: torrentFallbackKey } : {}),
+          ...(clearTorrentFallbackKey ? { clearApiKey: true } : {}),
+        },
         homeAssistant: {
           ...(webhook ? { webhookUrl: webhook } : {}),
           ...(clearWebhook ? { clearWebhookUrl: true } : {}),
@@ -104,11 +123,13 @@ const SettingsHub = () => {
       setLazyKey('');
       setProwlarrKey('');
       setSabnzbdKey('');
+      setTorrentFallbackKey('');
       setWebhook('');
       setClearLidarrKey(false);
       setClearLazyKey(false);
       setClearProwlarrKey(false);
       setClearSabnzbdKey(false);
+      setClearTorrentFallbackKey(false);
       setClearWebhook(false);
       await mutate();
       setMessage(
@@ -129,7 +150,12 @@ const SettingsHub = () => {
   };
 
   const test = async (
-    service: 'lidarr' | 'lazylibrarian' | 'prowlarr' | 'sabnzbd'
+    service:
+      | 'lidarr'
+      | 'lazylibrarian'
+      | 'prowlarr'
+      | 'sabnzbd'
+      | 'torrent-fallback'
   ) => {
     setMessage(undefined);
     try {
@@ -141,6 +167,10 @@ const SettingsHub = () => {
             lazylibrarian: 'LazyLibrarian',
             prowlarr: 'Prowlarr',
             sabnzbd: 'SABnzbd',
+            'torrent-fallback': tr(
+              'VPN-Torrent-Fallback',
+              'VPN torrent fallback'
+            ),
           }[service]
         } ${tr('ist erreichbar.', 'is reachable.')}`
       );
@@ -317,6 +347,154 @@ const SettingsHub = () => {
             {tr('Verbindung testen', 'Test connection')}
           </button>
         </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-5">
+        <div>
+          <h2 className="text-lg font-semibold">
+            {tr(
+              'VPN-gesicherter Torrent-Fallback',
+              'VPN-gated torrent fallback'
+            )}
+          </h2>
+          <p className="mt-1 text-sm text-gray-400">
+            {tr(
+              'Nach einem echten Sonarr-/Radarr-Fehler wird ein akzeptierter Torrent nur dann übernommen, wenn Gluetun läuft und das Exit-Land ausdrücklich erlaubt ist. Bei jedem unklaren Zustand bleibt der Fallback gesperrt.',
+              'After a real Sonarr/Radarr failure, an accepted torrent is grabbed only while Gluetun is running and the exit country is explicitly allowed. Any uncertain state blocks the fallback.'
+            )}
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={form.torrentFallback.enabled}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                torrentFallback: {
+                  ...form.torrentFallback,
+                  enabled: e.target.checked,
+                },
+              })
+            }
+          />
+          {tr('Automatischen Fallback aktivieren', 'Enable automatic fallback')}
+        </label>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="block text-sm">
+            {tr('VPN-Gate-URL', 'VPN gate URL')}
+            <input
+              className={fieldClass}
+              value={form.torrentFallback.vpnGateUrl}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  torrentFallback: {
+                    ...form.torrentFallback,
+                    vpnGateUrl: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label className="block text-sm">
+            {tr('Erlaubte Exit-Länder', 'Allowed exit countries')}
+            <input
+              className={fieldClass}
+              value={form.torrentFallback.allowedExitCountries.join(', ')}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  torrentFallback: {
+                    ...form.torrentFallback,
+                    allowedExitCountries: e.target.value
+                      .split(',')
+                      .map((value) => value.trim().toUpperCase())
+                      .filter(Boolean),
+                  },
+                })
+              }
+              placeholder="DK, NL, CH"
+            />
+          </label>
+          <label className="block text-sm">
+            {tr('VPN-Gate-API-Schlüssel', 'VPN gate API key')}{' '}
+            {form.torrentFallback.apiKeyConfigured && (
+              <span className="text-emerald-400">
+                {tr('(gesetzt)', '(configured)')}
+              </span>
+            )}
+            <input
+              type="password"
+              autoComplete="new-password"
+              className={fieldClass}
+              value={torrentFallbackKey}
+              onChange={(e) => setTorrentFallbackKey(e.target.value)}
+              placeholder={tr(
+                'Leer lassen, um den bestehenden Schlüssel zu behalten',
+                'Leave blank to keep the existing key'
+              )}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              {tr('Minimale Seeder', 'Minimum seeders')}
+              <input
+                type="number"
+                min="1"
+                className={fieldClass}
+                value={form.torrentFallback.minSeeders}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    torrentFallback: {
+                      ...form.torrentFallback,
+                      minSeeders: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="block text-sm">
+              {tr('Neuer Versuch nach Minuten', 'Retry after minutes')}
+              <input
+                type="number"
+                min="5"
+                className={fieldClass}
+                value={form.torrentFallback.retryCooldownMinutes}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    torrentFallback: {
+                      ...form.torrentFallback,
+                      retryCooldownMinutes: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+          </div>
+        </div>
+        {form.torrentFallback.apiKeyConfigured && (
+          <label className="flex items-center gap-2 text-sm text-red-200">
+            <input
+              type="checkbox"
+              checked={clearTorrentFallbackKey}
+              onChange={(e) => setClearTorrentFallbackKey(e.target.checked)}
+            />
+            {tr(
+              'Gespeicherten Gate-Schlüssel löschen',
+              'Delete stored gate key'
+            )}
+          </label>
+        )}
+        <button
+          type="button"
+          className="rounded bg-gray-700 px-3 py-2 text-sm hover:bg-gray-600"
+          onClick={() => test('torrent-fallback')}
+        >
+          {tr('VPN-Sicherheit testen', 'Test VPN safety gate')}
+        </button>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">

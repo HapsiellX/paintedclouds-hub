@@ -1,5 +1,6 @@
 import { scheduledJobs } from '@server/job/schedule';
 import { decryptHubSecret, encryptHubSecret } from '@server/lib/hub/secrets';
+import { checkVpnGate } from '@server/lib/hub/torrentFallback';
 import { getSettings } from '@server/lib/settings';
 import axios from 'axios';
 import { Router } from 'express';
@@ -54,6 +55,18 @@ const schema = z
       url: optionalUrl,
       apiKey: z.string().max(1000).optional(),
       clearApiKey: z.boolean().optional(),
+    }),
+    torrentFallback: z.object({
+      enabled: z.boolean(),
+      vpnGateUrl: optionalUrl,
+      apiKey: z.string().max(1000).optional(),
+      clearApiKey: z.boolean().optional(),
+      allowedExitCountries: z
+        .array(z.string().regex(/^[A-Z]{2}$/))
+        .min(1)
+        .max(20),
+      minSeeders: z.number().int().min(1).max(10000),
+      retryCooldownMinutes: z.number().int().min(5).max(1440),
     }),
     homeAssistant: z.object({
       webhookUrl: safeServiceUrl.optional(),
@@ -116,6 +129,11 @@ const publicSettings = () => {
       apiKey: undefined,
       apiKeyConfigured: Boolean(hub.sabnzbd.apiKey),
     },
+    torrentFallback: {
+      ...hub.torrentFallback,
+      apiKey: undefined,
+      apiKeyConfigured: Boolean(hub.torrentFallback?.apiKey),
+    },
     homeAssistant: {
       webhookUrlConfigured: Boolean(hub.homeAssistant.webhookUrl),
     },
@@ -153,10 +171,15 @@ hubSettingsRoutes.put('/', async (req, res) => {
     clearApiKey: clearSabnzbdApiKey,
     ...sabnzbd
   } = next.sabnzbd;
+  const {
+    apiKey: torrentFallbackApiKey,
+    clearApiKey: clearTorrentFallbackApiKey,
+    ...torrentFallback
+  } = next.torrentFallback;
   settings.hub = {
     ...settings.hub,
     ...next,
-    configurationVersion: 3,
+    configurationVersion: 4,
     environmentImported: settings.hub.environmentImported,
     lidarr: {
       ...lidarr,
@@ -190,6 +213,14 @@ hubSettingsRoutes.put('/', async (req, res) => {
           ? encryptHubSecret(sabnzbdApiKey, 'sabnzbd-api-key')
           : settings.hub.sabnzbd.apiKey,
     },
+    torrentFallback: {
+      ...torrentFallback,
+      apiKey: clearTorrentFallbackApiKey
+        ? undefined
+        : torrentFallbackApiKey
+          ? encryptHubSecret(torrentFallbackApiKey, 'torrent-fallback-api-key')
+          : settings.hub.torrentFallback.apiKey,
+    },
     homeAssistant: {
       webhookUrl: next.homeAssistant.clearWebhookUrl
         ? undefined
@@ -217,10 +248,32 @@ hubSettingsRoutes.put('/', async (req, res) => {
 hubSettingsRoutes.post('/test/:service', async (req, res) => {
   const settings = getSettings().hub;
   const service = z
-    .enum(['lidarr', 'lazylibrarian', 'prowlarr', 'sabnzbd'])
+    .enum([
+      'lidarr',
+      'lazylibrarian',
+      'prowlarr',
+      'sabnzbd',
+      'torrent-fallback',
+    ])
     .safeParse(req.params.service);
   if (!service.success)
     return res.status(404).json({ message: 'Unknown service.' });
+  if (service.data === 'torrent-fallback') {
+    const selected = settings.torrentFallback;
+    if (!selected.enabled || !selected.vpnGateUrl || !selected.apiKey) {
+      return res.status(400).json({
+        message: 'VPN gate URL, API key, and enabled fallback are required.',
+      });
+    }
+    const result = await checkVpnGate();
+    return result.safe
+      ? res.json({ healthy: true, country: result.country })
+      : res.status(502).json({
+          healthy: false,
+          country: result.country,
+          message: 'VPN safety gate test failed.',
+        });
+  }
   const selected =
     settings[service.data === 'lazylibrarian' ? 'lazyLibrarian' : service.data];
   if (!selected.url || !selected.apiKey) {

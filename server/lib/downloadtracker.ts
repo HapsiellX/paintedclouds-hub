@@ -12,6 +12,7 @@ import {
   persistServarrHistoryIssues,
   persistServarrQueueIssues,
 } from './hub/servarrIssueCollector';
+import { processTorrentFallbacks } from './hub/torrentFallback';
 
 interface EpisodeNumberResult {
   seasonNumber: number;
@@ -305,6 +306,12 @@ class DownloadTracker {
         [...sabQueue.entries()].flatMap(([id, slot]) =>
           slot.sizeLeft === undefined ? [] : [[id, slot.sizeLeft]]
         )
+      );
+      await processTorrentFallbacks().catch((error) =>
+        logger.error('Automatic torrent fallback pass failed', {
+          label: 'Torrent Fallback',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
       );
     } finally {
       this.updating = false;

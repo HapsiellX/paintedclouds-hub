@@ -76,6 +76,18 @@ export interface HistoryItem {
   episode?: { seasonNumber: number; episodeNumber: number };
 }
 
+export interface ServarrRelease {
+  guid: string;
+  indexerId: number;
+  title: string;
+  protocol?: string;
+  seeders?: number;
+  rejected?: boolean;
+  downloadAllowed?: boolean;
+  rejections?: string[];
+  [key: string]: unknown;
+}
+
 export interface Tag {
   id: number;
   label: string;
@@ -257,6 +269,15 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
         { cause: e }
       );
     }
+  };
+
+  public getReleases = async (
+    params: Record<string, number>
+  ): Promise<ServarrRelease[]> =>
+    this.get<ServarrRelease[]>('/release', { params }, 0);
+
+  public grabRelease = async (release: ServarrRelease): Promise<void> => {
+    await this.post('/release', release, undefined, 0);
   };
 
   public getTags = async (): Promise<Tag[]> => {
