@@ -48,6 +48,13 @@ const migrateHubSettings = (settings: any): AllSettings => {
     },
     prowlarr: { url: '' },
     sabnzbd: { url: '' },
+    torrentFallback: {
+      enabled: false,
+      vpnGateUrl: '',
+      allowedExitCountries: ['DK'],
+      minSeeders: 2,
+      retryCooldownMinutes: 30,
+    },
     homeAssistant: {
       webhookUrl: webhook
         ? encryptHubSecret(webhook, 'home-assistant-webhook')

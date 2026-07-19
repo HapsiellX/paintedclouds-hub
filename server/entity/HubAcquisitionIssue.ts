@@ -62,6 +62,15 @@ export class HubAcquisitionIssue {
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public resolvedAt?: Date | null;
 
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public torrentFallbackAttemptedAt?: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public torrentFallbackStatus?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public torrentFallbackCountry?: string | null;
+
   @DbAwareColumn({ type: 'datetime' })
   public lastSeenAt: Date;
 

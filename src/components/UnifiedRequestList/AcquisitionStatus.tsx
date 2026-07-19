@@ -123,6 +123,35 @@ const phaseTone = (phase: AcquisitionPhase, health: AcquisitionHealth) => {
   };
 };
 
+const torrentFallbackLabel = (
+  status: string,
+  country: string | undefined,
+  tr: (de: string, en: string) => string
+): string => {
+  const suffix = country ? ` (${country})` : '';
+  switch (status) {
+    case 'torrent_grabbed':
+      return `${tr('Torrent-Fallback wurde gestartet', 'Torrent fallback was started')}${suffix}`;
+    case 'vpn_blocked':
+      return `${tr('Torrent-Fallback wartet auf einen sicheren VPN-Status', 'Torrent fallback is waiting for a safe VPN state')}${suffix}`;
+    case 'no_torrent_found':
+      return tr(
+        'Noch kein akzeptierter Torrent mit genügend Seedern gefunden',
+        'No accepted torrent with enough seeders found yet'
+      );
+    case 'grab_failed':
+      return tr(
+        'Torrent-Fallback konnte noch nicht übernommen werden',
+        'Torrent fallback could not be grabbed yet'
+      );
+    default:
+      return tr(
+        'Für diesen Fehler ist kein automatischer Torrent-Fallback verfügbar',
+        'Automatic torrent fallback is unavailable for this failure'
+      );
+  }
+};
+
 interface AcquisitionStatusProps {
   acquisition: Acquisition;
   title: string;
@@ -296,6 +325,15 @@ const AcquisitionStatus = ({
       {acquisition.issue && (
         <div className="rounded border border-red-800 bg-red-950/40 p-2 text-sm text-red-100">
           <p>{formatAcquisitionIssueMessage(acquisition.issue, locale)}</p>
+          {acquisition.issue.torrentFallback && (
+            <p className="mt-1 text-xs text-red-200">
+              {torrentFallbackLabel(
+                acquisition.issue.torrentFallback.status,
+                acquisition.issue.torrentFallback.country,
+                tr
+              )}
+            </p>
+          )}
           {acquisition.issue.episodes?.length > 0 && (
             <p
               className="mt-1 text-xs text-red-200"

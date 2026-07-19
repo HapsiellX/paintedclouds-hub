@@ -1,4 +1,17 @@
-# V0.8.0-beta.2 operator notes
+# V0.8.0-beta.3 operator notes
+
+This beta adds a fail-closed torrent fallback for failed movie and episode
+downloads. StefARR only submits a torrent release already accepted by
+Radarr/Sonarr when the dedicated read-only Gluetun gate reports a running VPN,
+a public VPN address, and an explicitly allowed exit country. Gate timeouts,
+geolocation failures, disallowed countries, rejected releases, or insufficient
+seeders block the fallback. No fallback starts a request or bypasses ARR's
+quality and release rules.
+
+Administrators configure the encrypted gate key, allowlisted countries,
+minimum seeders, and retry cooldown in Settings > StefARR integrations. The
+request issue records the latest fallback result without storing a release
+title or public IP.
 
 This beta fixes episode-level acquisition problems that could remain active
 after a successful import or a later failed quality-upgrade attempt. Sonarr's
@@ -13,10 +26,10 @@ regression check for resolved upgrade failures and future episodes.
 
 ## Supported upgrade and rollback
 
-- The supported direct upgrade paths are **V0.7.0 or V0.8.0-beta.1 to
-  V0.8.0-beta.2** on SQLite and PostgreSQL.
-- V0.8.0-beta.2 adds no database migration. Back up the complete configuration
-  directory and database before upgrading.
+- The supported direct upgrade paths are **V0.7.0, V0.8.0-beta.1, or
+  V0.8.0-beta.2 to V0.8.0-beta.3** on SQLite and PostgreSQL.
+- V0.8.0-beta.3 adds nullable torrent-fallback state to acquisition issues.
+  Back up the complete configuration directory and database before upgrading.
 - Database downgrade is not supported. Rollback requires restoring the image
   together with its matching pre-upgrade database and configuration backup.
 

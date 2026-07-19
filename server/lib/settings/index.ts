@@ -153,6 +153,14 @@ export interface HubSettings {
   lazyLibrarian: HubServiceSettings;
   prowlarr: HubServiceSettings;
   sabnzbd: HubServiceSettings;
+  torrentFallback: {
+    enabled: boolean;
+    vpnGateUrl: string;
+    apiKey?: HubSecretValue;
+    allowedExitCountries: string[];
+    minSeeders: number;
+    retryCooldownMinutes: number;
+  };
   homeAssistant: { webhookUrl?: HubSecretValue };
   metadata: { contactEmail: string; userAgent: string };
   defaults: {
@@ -550,6 +558,13 @@ class Settings {
         lazyLibrarian: { url: '' },
         prowlarr: { url: '' },
         sabnzbd: { url: '' },
+        torrentFallback: {
+          enabled: false,
+          vpnGateUrl: '',
+          allowedExitCountries: ['DK'],
+          minSeeders: 2,
+          retryCooldownMinutes: 30,
+        },
         homeAssistant: {},
         metadata: { contactEmail: '', userAgent: '' },
         defaults: { languages: ['de', 'en'], bookFormats: ['ebook'] },

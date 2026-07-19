@@ -52,6 +52,11 @@ export interface HubAcquisitionIssueDto {
   message: string;
   retryable: boolean;
   acknowledged: boolean;
+  torrentFallback?: {
+    status: string;
+    country?: string;
+    attemptedAt?: string;
+  };
   episodes: { seasonNumber: number; episodeNumber: number }[];
 }
 
@@ -176,6 +181,13 @@ export const acquisitionIssueDto = (
     message: issue.message,
     retryable: issue.retryable,
     acknowledged: Boolean(issue.acknowledgedAt),
+    torrentFallback: issue.torrentFallbackStatus
+      ? {
+          status: issue.torrentFallbackStatus,
+          country: issue.torrentFallbackCountry ?? undefined,
+          attemptedAt: issue.torrentFallbackAttemptedAt?.toISOString(),
+        }
+      : undefined,
     episodes: episode ? [episode] : [],
   };
 };
