@@ -528,6 +528,86 @@ describe('StefARR by PaintedClouds', () => {
     cy.contains('Der Anbieter ist fehlgeschlagen.').should('not.exist');
   });
 
+  it('shows upgrade failures as resolved without counting future episodes as missing', () => {
+    const upgradeSearch = {
+      phase: 'searching',
+      health: 'ok',
+      availability: 'available',
+      progress: 0,
+      downloadedBytes: 0,
+      totalBytes: 0,
+      updatedAt: '2026-07-19T12:00:00.000Z',
+      stale: false,
+      sources: ['sonarr'],
+      counts: { requested: 2, queued: 0, imported: 2, failed: 0 },
+      parts: [],
+    };
+    cy.intercept('GET', '/api/v1/hub/activity*', {
+      results: [],
+      acquisitionQueue: {
+        summary: {
+          total: 1,
+          queued: 1,
+          waitingForRelease: 0,
+          downloading: 0,
+          processing: 0,
+          importPending: 0,
+          paused: 0,
+          failed: 0,
+          progress: 0,
+          downloadedBytes: 0,
+          totalBytes: 0,
+        },
+        groups: {
+          downloading: [],
+          queued: [
+            {
+              id: 'video:620',
+              kind: 'tv',
+              externalId: '620',
+              title: 'Serie mit zukünftigem Staffelfinale',
+              acquisition: upgradeSearch,
+            },
+          ],
+          processing: [],
+          paused: [],
+          problems: [],
+        },
+        issues: [],
+        recentIssues: [
+          {
+            source: 'seerr',
+            requestId: 620,
+            title: 'Serie mit zukünftigem Staffelfinale',
+            kind: 'tv',
+            reasonCode: 'download_failed',
+            message: 'Ein Qualitäts-Upgrade ist fehlgeschlagen.',
+            resolvedAt: '2026-07-19T11:45:00.000Z',
+            acknowledged: false,
+          },
+        ],
+        observedAt: '2026-07-19T12:00:00.000Z',
+        stale: false,
+      },
+      take: 20,
+      skip: 0,
+      total: 0,
+      hasMore: false,
+    }).as('historicalUpgrade');
+
+    cy.visit('/requests');
+    cy.wait('@historicalUpgrade');
+    cy.get('[data-testid=acquisition-summary-problems]').should('contain', '0');
+    cy.get('[data-testid=acquisition-item-problems]').should('not.exist');
+    cy.get('[data-testid=recent-acquisition-issue]')
+      .should('contain', 'Serie mit zukünftigem Staffelfinale')
+      .and('be.visible');
+    cy.contains('Serie mit zukünftigem Staffelfinale')
+      .parents('[data-testid=acquisition-item-queued]')
+      .should('contain', 'Folgen: 2 von 2 importiert')
+      .and('not.contain', 'von 3 importiert');
+  });
+
   it('debounces request search while keeping typed text responsive', () => {
     const activityQueries: string[] = [];
     cy.intercept('GET', '/api/v1/hub/activity*', (request) => {
