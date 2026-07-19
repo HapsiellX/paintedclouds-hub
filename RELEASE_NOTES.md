@@ -1,4 +1,8 @@
-# V0.8.0-beta.3 operator notes
+# V0.8.0-beta.4 operator notes
+
+This beta also exposes the VPN gate connection test through the validated
+OpenAPI service enum so the Settings button reaches the already protected
+server handler.
 
 This beta adds a fail-closed torrent fallback for failed movie and episode
 downloads. StefARR only submits a torrent release already accepted by
@@ -26,9 +30,10 @@ regression check for resolved upgrade failures and future episodes.
 
 ## Supported upgrade and rollback
 
-- The supported direct upgrade paths are **V0.7.0, V0.8.0-beta.1, or
-  V0.8.0-beta.2 to V0.8.0-beta.3** on SQLite and PostgreSQL.
-- V0.8.0-beta.3 adds nullable torrent-fallback state to acquisition issues.
+- The supported direct upgrade paths are **V0.7.0, V0.8.0-beta.1,
+  V0.8.0-beta.2, or V0.8.0-beta.3 to V0.8.0-beta.4** on SQLite and PostgreSQL.
+- V0.8.0-beta.4 includes the nullable torrent-fallback state introduced in
+  Beta 3.
   Back up the complete configuration directory and database before upgrading.
 - Database downgrade is not supported. Rollback requires restoring the image
   together with its matching pre-upgrade database and configuration backup.

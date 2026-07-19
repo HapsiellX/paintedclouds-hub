@@ -8826,7 +8826,11 @@ paths:
           name: service
           required: true
           schema:
-            { type: string, enum: [lidarr, lazylibrarian, prowlarr, sabnzbd] }
+            {
+              type: string,
+              enum:
+                [lidarr, lazylibrarian, prowlarr, sabnzbd, torrent-fallback],
+            }
       responses:
         '200': { description: Connection succeeded }
 security:
