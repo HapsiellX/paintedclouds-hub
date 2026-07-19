@@ -48,7 +48,7 @@ export interface QualityProfile {
   name: string;
 }
 
-interface QueueItem {
+export interface QueueItem {
   size: number;
   title: string;
   sizeleft: number;
@@ -62,6 +62,18 @@ interface QueueItem {
   downloadClient: string;
   indexer: string;
   id: number;
+  statusMessages?: { title?: string; messages?: string[] }[];
+}
+
+export interface HistoryItem {
+  id: number;
+  movieId?: number;
+  seriesId?: number;
+  episodeId?: number;
+  eventType: string;
+  date: string;
+  data?: Record<string, string>;
+  episode?: { seasonNumber: number; episodeNumber: number };
 }
 
 export interface Tag {
@@ -164,19 +176,84 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
 
   public getQueue = async (): Promise<(QueueItem & QueueItemAppendT)[]> => {
     try {
-      const response = await this.axios.get<QueueResponse<QueueItemAppendT>>(
-        `/queue`,
-        {
-          params: {
-            includeEpisode: true,
-          },
-        }
+      const records: (QueueItem & QueueItemAppendT)[] = [];
+      const pageSize = 250;
+      const maxPages = 20;
+      const maxRecords = pageSize * maxPages;
+      let page = 1;
+      let totalRecords = 0;
+      do {
+        const response = await this.get<QueueResponse<QueueItemAppendT>>(
+          '/queue',
+          { params: { includeEpisode: true, page, pageSize } },
+          0
+        );
+        const pageRecords = response.records;
+        if (!pageRecords.length) break;
+        records.push(...pageRecords.slice(0, maxRecords - records.length));
+        totalRecords = response.totalRecords;
+        page += 1;
+      } while (
+        records.length < totalRecords &&
+        records.length < maxRecords &&
+        page <= maxPages
       );
-
-      return response.data.records;
+      return records;
     } catch (e) {
       throw new Error(
         `[${this.apiName}] Failed to retrieve queue: ${e.message}`,
+        { cause: e }
+      );
+    }
+  };
+
+  public getRecentHistory = async (): Promise<HistoryItem[]> => {
+    try {
+      const records: HistoryItem[] = [];
+      const pageSize = 250;
+      const maxPages = 20;
+      const maxRecords = pageSize * maxPages;
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1_000;
+      let page = 1;
+      let totalRecords = 0;
+      let reachedCutoff = false;
+      do {
+        const response = await this.get<{
+          totalRecords: number;
+          records: HistoryItem[];
+        }>(
+          '/history',
+          {
+            params: {
+              page,
+              pageSize,
+              sortDirection: 'descending',
+              includeEpisode: true,
+            },
+          },
+          0
+        );
+        totalRecords = response.totalRecords;
+        if (!response.records.length) break;
+        for (const item of response.records) {
+          if (new Date(item.date).getTime() < cutoff) {
+            reachedCutoff = true;
+            break;
+          }
+          records.push(item);
+          if (records.length >= maxRecords) break;
+        }
+        page += 1;
+      } while (
+        !reachedCutoff &&
+        records.length < totalRecords &&
+        records.length < maxRecords &&
+        page <= maxPages
+      );
+      return records;
+    } catch (e) {
+      throw new Error(
+        `[${this.apiName}] Failed to retrieve download history: ${e.message}`,
         { cause: e }
       );
     }

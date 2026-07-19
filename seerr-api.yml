@@ -51,6 +51,77 @@ servers:
 
 components:
   schemas:
+    HubAcquisition:
+      type: object
+      required:
+        [
+          phase,
+          health,
+          availability,
+          progress,
+          downloadedBytes,
+          totalBytes,
+          updatedAt,
+          stale,
+          sources,
+          parts,
+        ]
+      properties:
+        phase:
+          type: string
+          enum:
+            [
+              waiting_for_release,
+              searching,
+              queued,
+              downloading,
+              paused,
+              repairing,
+              verifying,
+              extracting,
+              import_pending,
+              importing,
+              partially_available,
+              available,
+              failed,
+              unknown,
+            ]
+        health: { type: string, enum: [ok, warning, error, stale] }
+        availability:
+          { type: string, enum: [missing, partial, imported, available] }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        downloadedBytes: { type: number, minimum: 0 }
+        totalBytes: { type: number, minimum: 0 }
+        queuePosition: { type: integer, minimum: 1 }
+        timeLeft: { type: string }
+        estimatedCompletionTime: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        stale: { type: boolean }
+        sources:
+          type: array
+          items:
+            {
+              type: string,
+              enum: [sabnzbd, sonarr, radarr, lidarr, lazylibrarian],
+            }
+        counts: { type: object }
+        parts: { type: array, items: { type: object } }
+        issue:
+          type: object
+          properties:
+            id: { type: integer }
+            reasonCode: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }
+            acknowledged: { type: boolean }
+            episodes:
+              type: array
+              items:
+                type: object
+                required: [seasonNumber, episodeNumber]
+                properties:
+                  seasonNumber: { type: integer, minimum: 0 }
+                  episodeNumber: { type: integer, minimum: 1 }
     Blocklist:
       type: object
       properties:
@@ -8367,11 +8438,110 @@ paths:
         - in: query
           name: query
           schema: { type: string, maxLength: 200 }
+        - in: query
+          name: scanCursor
+          description: Raw bounded-scan cursor returned by a previous filtered response
+          schema: { type: integer, minimum: 0 }
       responses:
         '200':
           description: >-
             Paginated unified activity with a permission-scoped, sanitized
-            Radarr and Sonarr download queue
+            acquisition queue and persistent issues
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [
+                    results,
+                    queue,
+                    acquisitionQueue,
+                    take,
+                    skip,
+                    total,
+                    totalIsEstimate,
+                    scanExhausted,
+                    hasMore,
+                  ]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        acquisition:
+                          $ref: '#/components/schemas/HubAcquisition'
+                  queue:
+                    type: array
+                    description: Legacy v0.7 download queue
+                  acquisitionQueue:
+                    type: object
+                    required:
+                      [summary, groups, issues, recentIssues, observedAt, stale]
+                    properties:
+                      summary: { type: object }
+                      groups: { type: object }
+                      issues: { type: array, items: { type: object } }
+                      recentIssues:
+                        type: array
+                        description: >-
+                          Permission-scoped, privacy-safe acquisition issues
+                          resolved within the last seven days
+                        items:
+                          type: object
+                          required:
+                            [
+                              source,
+                              requestId,
+                              title,
+                              kind,
+                              reasonCode,
+                              message,
+                              resolvedAt,
+                              acknowledged,
+                            ]
+                          properties:
+                            source: { type: string, enum: [seerr, hub] }
+                            requestId: { type: integer, minimum: 1 }
+                            title: { type: string }
+                            kind:
+                              type: string
+                              enum: [movie, tv, music_artist, music_album, book]
+                            reasonCode: { type: string }
+                            message: { type: string }
+                            resolvedAt: { type: string, format: date-time }
+                            acknowledged: { type: boolean }
+                      observedAt: { type: string, format: date-time }
+                      lastUpdatedAt: { type: string, format: date-time }
+                      stale: { type: boolean }
+                  take: { type: integer, minimum: 1, maximum: 100 }
+                  skip: { type: integer, minimum: 0 }
+                  total:
+                    type: integer
+                    minimum: 0
+                    description: Matches in the current bounded scan window
+                  totalIsEstimate:
+                    type: boolean
+                    description: >-
+                      True when filters use a bounded server-side scan window
+                  scanExhausted:
+                    type: boolean
+                    description: >-
+                      True when more raw requests may exist beyond the bounded
+                      filter scan window
+                  nextScanCursor:
+                    type: integer
+                    minimum: 0
+                    description: Cursor for continuing a bounded filtered scan
+                  nextSkip:
+                    type: integer
+                    minimum: 0
+                    description: >-
+                      Match offset within nextScanCursor's raw scan window
+                  hasMore:
+                    type: boolean
+                    description: >-
+                      True when another cursor/skip pair can continue the list
   /hub/items/{kind}/{provider}/{externalId}:
     get:
       summary: Resolve canonical artist, album, work and edition details
@@ -8569,6 +8739,34 @@ paths:
       responses:
         '200': { description: Retried request }
         '409': { description: Request is not failed }
+  /hub/acquisition/issues/{id}/acknowledge:
+    post:
+      summary: Acknowledge an acquisition issue as an authorized request manager
+      tags: [hub]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Privacy-safe issue acknowledgement }
+        '403': { description: Request management permission required }
+        '404': { description: Issue not found or not visible }
+  /hub/acquisition/issues/{id}/retry:
+    post:
+      summary: Retry a failed acquisition
+      tags: [hub]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Acquisition retry accepted }
+        '403': { description: Request management permission required }
+        '404': { description: Issue not found or not visible }
+        '409':
+          description: 'Issue is non-retryable, already claimed, or the provider command failed'
   /hub/requests/{id}/decline:
     post:
       summary: Decline a pending Hub request

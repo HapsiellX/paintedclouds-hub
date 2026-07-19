@@ -26,11 +26,14 @@ Hub API keys and webhook URLs are encrypted in `settings.json`; the matching
 `hub-secrets.key` decrypts them. Both files, database credentials, and all other
 application secrets remain sensitive and must be access-controlled together.
 
-Radarr and Sonarr queue data is held in memory for the download-progress view.
-The public activity response follows existing request permissions and omits raw
-release filenames and download-client identifiers. It contains requested
-titles, sanitized states, byte totals, remaining time, and episode numbers for
-downloads the current user is allowed to see.
+Live acquisition snapshots from Radarr, Sonarr, Lidarr, LazyLibrarian, and
+SABnzbd are held in memory for the requests view. Normalized acquisition issues
+are stored without raw release filenames, filesystem paths, or download-client
+identifiers. Open issues remain until resolved; resolved issues are retained for
+seven days. The public activity response follows existing request permissions
+and contains only requested titles, sanitized states, byte totals, remaining
+time, episode numbers, and localized reason codes for work the current user is
+allowed to see.
 
 ## External Services
 

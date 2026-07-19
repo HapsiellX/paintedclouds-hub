@@ -5,6 +5,7 @@ export type HubActivityFilters = {
   formats?: string;
   states?: string;
   query?: string;
+  scanCursor?: number;
 };
 
 export const buildHubActivityUrl = ({
@@ -14,6 +15,7 @@ export const buildHubActivityUrl = ({
   formats,
   states,
   query,
+  scanCursor,
 }: HubActivityFilters): string => {
   const params = new URLSearchParams({
     take: String(take),
@@ -24,6 +26,7 @@ export const buildHubActivityUrl = ({
   if (formats) params.set('formats', formats);
   if (states) params.set('states', states);
   if (query) params.set('query', query);
+  if (scanCursor) params.set('scanCursor', String(scanCursor));
 
   return `/api/v1/hub/activity?${params.toString()}`;
 };

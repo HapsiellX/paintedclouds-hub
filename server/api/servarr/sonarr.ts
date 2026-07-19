@@ -354,6 +354,25 @@ class SonarrAPI extends ServarrBase<{
     }
   }
 
+  public async retrySeriesSearch(seriesId: number): Promise<void> {
+    await this.runCommand('MissingEpisodeSearch', { seriesId });
+  }
+
+  public async retryEpisodeSearch(
+    seriesId: number,
+    seasonNumber: number,
+    episodeNumber: number
+  ): Promise<void> {
+    const episodes = await this.getEpisodes(seriesId);
+    const episode = episodes.find(
+      (candidate) =>
+        candidate.seasonNumber === seasonNumber &&
+        candidate.episodeNumber === episodeNumber
+    );
+    if (!episode) throw new Error('Episode not found');
+    await this.runCommand('EpisodeSearch', { episodeIds: [episode.id] });
+  }
+
   public async getEpisodes(seriesId: number): Promise<EpisodeResult[]> {
     try {
       const response = await this.axios.get<EpisodeResult[]>('/episode', {
