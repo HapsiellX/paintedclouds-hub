@@ -1,4 +1,11 @@
-# V0.8.0-beta.4 operator notes
+# V0.8.0-beta.5 operator notes
+
+This security beta updates Axios from 1.16.0 to 1.18.0. It fixes
+GHSA-xj6q-8x83-jv6g, which could allow an existing prototype-pollution flaw in
+a host application to influence outbound Basic authentication fields. The
+update also strengthens cross-origin redirect header handling and rejects
+malformed HTTP(S) URLs. No application API or database schema changes are
+included.
 
 This beta also exposes the VPN gate connection test through the validated
 OpenAPI service enum so the Settings button reaches the already protected
@@ -31,9 +38,10 @@ regression check for resolved upgrade failures and future episodes.
 ## Supported upgrade and rollback
 
 - The supported direct upgrade paths are **V0.7.0, V0.8.0-beta.1,
-  V0.8.0-beta.2, or V0.8.0-beta.3 to V0.8.0-beta.4** on SQLite and PostgreSQL.
-- V0.8.0-beta.4 includes the nullable torrent-fallback state introduced in
-  Beta 3.
+  V0.8.0-beta.2, V0.8.0-beta.3, or V0.8.0-beta.4 to V0.8.0-beta.5** on SQLite
+  and PostgreSQL.
+- V0.8.0-beta.5 includes the nullable torrent-fallback state introduced in
+  Beta 3 and requires no additional database migration from Beta 4.
   Back up the complete configuration directory and database before upgrading.
 - Database downgrade is not supported. Rollback requires restoring the image
   together with its matching pre-upgrade database and configuration backup.
