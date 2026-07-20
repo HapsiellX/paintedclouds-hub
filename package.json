@@ -1,6 +1,6 @@
 {
   "name": "stefarr",
-  "version": "0.8.0-beta.4",
+  "version": "0.8.0-beta.5",
   "private": false,
   "packageManager": "pnpm@10.24.0",
   "scripts": {
