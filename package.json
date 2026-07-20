@@ -50,7 +50,7 @@
     "@svgr/webpack": "8.1.0",
     "@tanem/react-nprogress": "6.0.3",
     "ace-builds": "1.43.6",
-    "axios": "1.16.0",
+    "axios": "1.18.0",
     "axios-rate-limit": "1.9.0",
     "bcrypt": "6.0.0",
     "bowser": "2.14.1",
