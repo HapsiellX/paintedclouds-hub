@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       image_ref:
-        description: GHCR tag or digest; defaults to the alpha channel
+        description: GHCR tag or digest; defaults to the beta channel
         required: false
         type: string
 
@@ -33,11 +33,13 @@ jobs:
         shell: bash
         env:
           REQUESTED_REF: ${{ inputs.image_ref }}
-          DEFAULT_REF: ghcr.io/${{ github.repository }}:alpha
         run: |
-          image_ref=${REQUESTED_REF:-$DEFAULT_REF}
-          if [[ "$image_ref" != ghcr.io/${{ github.repository }}:* && \
-                "$image_ref" != ghcr.io/${{ github.repository }}@sha256:* ]]; then
+          repository=${GITHUB_REPOSITORY,,}
+          image="ghcr.io/$repository"
+          image_ref=${REQUESTED_REF:-$image:beta}
+          image_ref=${image_ref,,}
+          if [[ "$image_ref" != "$image":* && \
+                "$image_ref" != "$image"@sha256:* ]]; then
             echo 'Only this repository GHCR package may be scanned' >&2
             exit 1
           fi
