@@ -1,4 +1,21 @@
-# V0.8.0-beta.5 operator notes
+# V0.8.0-beta.6 operator notes
+
+This security beta resolves the August 2026 dependency advisories reported by
+GitHub and Trivy. Direct runtime updates include Next.js 16.2.11, Undici 8.9.0,
+Sharp 0.35.0, js-yaml 4.3.1, Nanoid 5.1.16, TypeORM 0.3.31, and the matching
+Next.js lint packages. PostCSS and vulnerable transitive dependencies used by
+the application, documentation generator, and duplicate detector are pinned to
+patched releases as well.
+
+The complete source, secret, and configuration scan reports no fixable high or
+critical findings. Two high-severity `image-size` advisories remain visible for
+the documentation-only dependency because no patched upstream release exists
+as of this release; the lockfile already uses the newest published version.
+They are not part of the production runtime image.
+
+No application API or database schema changes are included in Beta 6.
+
+## Previous Beta 5 changes
 
 This security beta updates Axios from 1.16.0 to 1.18.0. It fixes
 GHSA-xj6q-8x83-jv6g, which could allow an existing prototype-pollution flaw in
@@ -37,11 +54,11 @@ regression check for resolved upgrade failures and future episodes.
 
 ## Supported upgrade and rollback
 
-- The supported direct upgrade paths are **V0.7.0, V0.8.0-beta.1,
-  V0.8.0-beta.2, V0.8.0-beta.3, or V0.8.0-beta.4 to V0.8.0-beta.5** on SQLite
-  and PostgreSQL.
-- V0.8.0-beta.5 includes the nullable torrent-fallback state introduced in
-  Beta 3 and requires no additional database migration from Beta 4.
+- The supported direct upgrade paths are **V0.7.0 and every earlier
+  V0.8.0 beta through V0.8.0-beta.5 to V0.8.0-beta.6** on SQLite and
+  PostgreSQL.
+- V0.8.0-beta.6 includes the nullable torrent-fallback state introduced in
+  Beta 3 and requires no additional database migration from Beta 5.
   Back up the complete configuration directory and database before upgrading.
 - Database downgrade is not supported. Rollback requires restoring the image
   together with its matching pre-upgrade database and configuration backup.
