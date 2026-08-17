@@ -8,7 +8,7 @@ import { useRouter } from 'next/router';
 
 export interface PersonalizedItem {
   kind: 'movie' | 'tv' | 'music_artist' | 'music_album' | 'book';
-  provider: 'tmdb' | 'musicbrainz' | 'openlibrary';
+  provider: 'tmdb' | 'musicbrainz' | 'openlibrary' | 'lobid';
   externalId: string;
   title: string;
   subtitle?: string;
@@ -101,8 +101,12 @@ const PersonalizedCard = ({
       void router.push(`/${item.kind}/${item.externalId}`);
     else
       void router.push({
-        pathname: '/hub',
-        query: { query: item.title, kinds: item.kind },
+        pathname: '/hub/[kind]/[id]',
+        query: {
+          kind: item.kind,
+          id: item.externalId,
+          provider: item.provider,
+        },
       });
   };
 

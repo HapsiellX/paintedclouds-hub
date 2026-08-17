@@ -95,6 +95,7 @@ const trustedImageHosts = new Map([
   ['tmdb', new Set(['image.tmdb.org'])],
   ['musicbrainz', new Set(['coverartarchive.org'])],
   ['openlibrary', new Set(['covers.openlibrary.org'])],
+  ['lobid', new Set<string>()],
 ]);
 
 const requestSchema = z
@@ -104,12 +105,12 @@ const requestSchema = z
       HubMediaKind.MUSIC_ALBUM,
       HubMediaKind.BOOK,
     ]),
-    provider: z.enum(['musicbrainz', 'openlibrary']),
+    provider: z.enum(['musicbrainz', 'openlibrary', 'lobid']),
     externalId: z.string().trim().min(1).max(128),
     editionId: z
       .string()
       .trim()
-      .regex(/^OL\d+M$/i)
+      .regex(/^(?:OL\d+M|LOBID-\d{12,20})$/i)
       .optional(),
     title: z.string().trim().min(1).max(500),
     subtitle: z.string().trim().max(500).optional(),
@@ -135,7 +136,8 @@ const requestSchema = z
       body.kind === HubMediaKind.MUSIC_ALBUM;
     if (
       (musicKind && body.provider !== 'musicbrainz') ||
-      (body.kind === HubMediaKind.BOOK && body.provider !== 'openlibrary')
+      (body.kind === HubMediaKind.BOOK &&
+        !['openlibrary', 'lobid'].includes(body.provider))
     ) {
       context.addIssue({
         code: 'custom',
@@ -150,11 +152,18 @@ const requestSchema = z
         message: 'Ungültige MusicBrainz-ID.',
       });
     }
-    if (body.kind === HubMediaKind.BOOK && !/^OL\d+W$/i.test(body.externalId)) {
+    if (
+      body.kind === HubMediaKind.BOOK &&
+      !(
+        (body.provider === 'openlibrary' &&
+          /^OL\d+W$/i.test(body.externalId)) ||
+        (body.provider === 'lobid' && /^\d{12,20}$/.test(body.externalId))
+      )
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['externalId'],
-        message: 'Ungültige Open-Library-ID.',
+        message: 'Ungültige Buchkatalog-ID.',
       });
     }
     if (body.imageUrl) {
@@ -215,7 +224,7 @@ const profileSchema = z
 const signalSchema = z
   .object({
     kind: z.enum(HubMediaKind),
-    provider: z.enum(['tmdb', 'musicbrainz', 'openlibrary']),
+    provider: z.enum(['tmdb', 'musicbrainz', 'openlibrary', 'lobid']),
     externalId: z.string().trim().min(1).max(128),
     liked: z.boolean().optional(),
     hidden: z.boolean().optional(),
@@ -240,7 +249,10 @@ const signalSchema = z
         z.uuid().safeParse(body.externalId).success) ||
       (body.provider === 'openlibrary' &&
         body.kind === HubMediaKind.BOOK &&
-        /^OL\d+W$/i.test(body.externalId));
+        /^OL\d+W$/i.test(body.externalId)) ||
+      (body.provider === 'lobid' &&
+        body.kind === HubMediaKind.BOOK &&
+        /^\d{12,20}$/.test(body.externalId));
     if (!valid)
       context.addIssue({
         code: 'custom',
@@ -436,7 +448,7 @@ hubRoutes.get(
           HubMediaKind.MUSIC_ALBUM,
           HubMediaKind.BOOK,
         ]),
-        provider: z.enum(['musicbrainz', 'openlibrary']),
+        provider: z.enum(['musicbrainz', 'openlibrary', 'lobid']),
         externalId: z.string().min(1).max(128),
       })
       .safeParse(req.params);
@@ -537,7 +549,9 @@ hubRoutes.put(
         ? body.externalId.toUpperCase()
         : body.provider === 'musicbrainz'
           ? body.externalId.toLowerCase()
-          : String(Number(body.externalId));
+          : body.provider === 'lobid'
+            ? body.externalId
+            : String(Number(body.externalId));
     const repository = getRepository(HubUserSignal);
     let signal = await repository.findOne({
       where: {

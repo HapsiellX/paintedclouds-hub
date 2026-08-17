@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   buildHubRecentMusicQuery,
   HubCatalogItemNotFoundError,
+  rankRelevantBookResults,
   resolveHubCatalogItem,
   selectMajorStreamingProviderIds,
 } from '@server/api/hub/catalog';
@@ -46,6 +47,32 @@ describe('Hub catalog item resolution', () => {
       [8, 9, 337, 283]
     );
   });
+
+  it('removes broad catalog matches that do not meaningfully match a specialist title', () => {
+    const query =
+      'Das Bistum Hildesheim im Mittelalter Geistliche Herrschaft und herrschaftlicher Raum';
+    const results = rankRelevantBookResults(query, [
+      {
+        kind: HubMediaKind.BOOK,
+        provider: 'lobid',
+        externalId: '990013748890108971',
+        title: 'Das Bistum Hildesheim im Mittelalter',
+        subtitle: 'Geistliche Herrschaft und herrschaftlicher Raum',
+      },
+      {
+        kind: HubMediaKind.BOOK,
+        provider: 'lobid',
+        externalId: '991000301749706483',
+        title: 'Die evangelischen Kirchenordnungen des 16. Jahrhunderts',
+        subtitle: 'Geistliche Gebiete und Herrschaften',
+      },
+    ]);
+
+    assert.deepStrictEqual(
+      results.map((item) => item.externalId),
+      ['990013748890108971']
+    );
+  });
   it('resolves canonical MusicBrainz album metadata from a fixed endpoint', async () => {
     const calls: string[] = [];
     const id = '123e4567-e89b-42d3-a456-426614174000';
@@ -69,7 +96,7 @@ describe('Hub catalog item resolution', () => {
         provider: 'musicbrainz',
         externalId: id,
       },
-      { musicBrainz, openLibrary: unusedClient }
+      { musicBrainz, openLibrary: unusedClient, lobid: unusedClient }
     );
 
     assert.deepStrictEqual(calls, [`/release-group/${id}`]);
@@ -107,7 +134,7 @@ describe('Hub catalog item resolution', () => {
         provider: 'openlibrary',
         externalId: 'OL123W',
       },
-      { musicBrainz: unusedClient, openLibrary }
+      { musicBrainz: unusedClient, openLibrary, lobid: unusedClient }
     );
 
     assert.deepStrictEqual(calls, [
@@ -138,7 +165,7 @@ describe('Hub catalog item resolution', () => {
           provider: 'openlibrary',
           externalId: '../admin',
         },
-        { musicBrainz: client, openLibrary: client }
+        { musicBrainz: client, openLibrary: client, lobid: client }
       ),
       HubCatalogItemNotFoundError
     );
@@ -163,9 +190,44 @@ describe('Hub catalog item resolution', () => {
           provider: 'musicbrainz',
           externalId: id,
         },
-        { musicBrainz, openLibrary: unusedClient }
+        { musicBrainz, openLibrary: unusedClient, lobid: unusedClient }
       ),
       HubCatalogItemNotFoundError
     );
+  });
+
+  it('resolves canonical lobid book metadata and ISBNs from a fixed endpoint', async () => {
+    const calls: string[] = [];
+    const lobid = {
+      get: async (path: string) => {
+        calls.push(path);
+        return {
+          data: {
+            id: 'http://lobid.org/resources/990013748890108971#!',
+            title: 'Die Synoden im Reichsgebiet',
+            responsibilityStatement: ['Heinz Wolter'],
+            publication: [{ startDate: '1988', publishedBy: ['Schöningh'] }],
+            isbn: ['3506746871', '9783506746870'],
+            language: [{ id: 'http://id.loc.gov/vocabulary/iso639-2/ger' }],
+            type: ['BibliographicResource', 'Book'],
+          },
+        };
+      },
+    } as unknown as CatalogClient;
+
+    const item = await resolveHubCatalogItem(
+      {
+        kind: HubMediaKind.BOOK,
+        provider: 'lobid',
+        externalId: '990013748890108971',
+      },
+      { musicBrainz: unusedClient, openLibrary: unusedClient, lobid }
+    );
+
+    assert.deepStrictEqual(calls, ['/990013748890108971.json']);
+    assert.strictEqual(item.title, 'Die Synoden im Reichsgebiet');
+    assert.strictEqual(item.subtitle, 'Heinz Wolter');
+    assert.strictEqual(item.year, 1988);
+    assert.deepStrictEqual(item.languages, ['ger']);
   });
 });

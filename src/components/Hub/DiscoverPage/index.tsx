@@ -16,7 +16,7 @@ type MediaSection = 'music' | 'books';
 
 interface CatalogItem {
   kind: 'music_album' | 'book';
-  provider: 'musicbrainz' | 'openlibrary';
+  provider: 'musicbrainz' | 'openlibrary' | 'lobid';
   externalId: string;
   title: string;
   subtitle?: string;

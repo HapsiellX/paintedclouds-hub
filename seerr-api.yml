@@ -8554,7 +8554,7 @@ paths:
         - in: path
           name: provider
           required: true
-          schema: { type: string, enum: [musicbrainz, openlibrary] }
+          schema: { type: string, enum: [musicbrainz, openlibrary, lobid] }
         - in: path
           name: externalId
           required: true
@@ -8686,11 +8686,11 @@ paths:
                   enum: [music_artist, music_album, book]
                 provider:
                   type: string
-                  enum: [musicbrainz, openlibrary]
+                  enum: [musicbrainz, openlibrary, lobid]
                 externalId: { type: string, minLength: 1, maxLength: 128 }
                 editionId:
                   type: string
-                  pattern: '^OL\d+M$'
+                  pattern: '^(OL\d+M|LOBID-\d{12,20})$'
                 title: { type: string, minLength: 1, maxLength: 500 }
                 subtitle: { type: string, maxLength: 500 }
                 imageUrl: { type: string, format: uri, maxLength: 2000 }

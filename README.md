@@ -31,6 +31,9 @@ The current-media discovery behavior introduced in V0.5 is documented in the
 [music-source, recency, streaming, and upgrade notes](docs/v0.5-current-discovery.md)
 and the underlying
 [personalization privacy model](docs/v0.4-personalization-beta.md).
+The academic-book catalog fallback and its legal-access boundaries are
+documented in the
+[academic-book discovery notes](docs/academic-book-discovery.md).
 
 ## What It Does
 
@@ -38,7 +41,8 @@ and the underlying
   Radarr, and Sonarr workflows.
 - Discovers artists and albums with MusicBrainz and Cover Art Archive metadata,
   then submits music requests to Lidarr.
-- Discovers books with Open Library metadata, then submits e-book and audiobook
+- Discovers books with Open Library and the lobid union catalog, exposes legal
+  library and catalog access paths, then submits canonical e-book and audiobook
   requests to LazyLibrarian.
 - Provides a unified request overview, weighted request policy, audit events,
   visible movie and episode download progress, service health information, and
@@ -48,8 +52,9 @@ and the underlying
 
 ## Current Supported Scope
 
-- Music and book requests use canonical MusicBrainz and Open Library identities.
-  Books with multiple editions require an explicit edition selection.
+- Music and book requests use canonical MusicBrainz, Open Library, and lobid
+  identities. Books with multiple editions require an explicit edition
+  selection.
 - Lidarr and LazyLibrarian states are reconciled into a normalized request
   lifecycle. Temporary downstream failures preserve the last known good state.
 - Non-administrator auto-approval is opt-in and protected by a transactional,
