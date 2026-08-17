@@ -6,6 +6,11 @@ the hbz union catalog and is particularly useful for German academic and older
 specialist publications. Results are merged by normalized title and year, with
 canonical provider identifiers retained for later resolution.
 
+Partial search responses remain usable when one external provider is
+temporarily unavailable, but they are not cached. A later search therefore
+retries the missing provider instead of preserving a transient failure for the
+normal six-hour metadata TTL.
+
 The detail page offers catalog and library routes such as WorldCat, Google
 Books, and the corresponding lobid record. These are discovery links, not a
 claim that a downloadable copy is licensed. StefARR does not scrape, proxy, or

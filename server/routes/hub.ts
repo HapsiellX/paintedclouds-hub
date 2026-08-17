@@ -395,9 +395,10 @@ hubRoutes.get('/search', hubCatalogLimiter, async (req, res) => {
       .digest('hex');
     const results = await withHubMetadataCache(
       'catalog',
-      `search:${cacheKey}`,
+      `search:v2:${cacheKey}`,
       () => searchHubCatalog({ query, kinds: selectedKinds, language }),
-      6 * 60 * 60 * 1000
+      6 * 60 * 60 * 1000,
+      (result) => result.errors.length === 0
     );
     return res.json(sanitizeCatalogResult(results));
   } catch {
