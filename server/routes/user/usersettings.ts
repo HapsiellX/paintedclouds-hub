@@ -10,6 +10,7 @@ import type {
   UserSettingsGeneralResponse,
   UserSettingsNotificationsResponse,
 } from '@server/interfaces/api/userSettingsInterfaces';
+import { accountLinkLimiter } from '@server/lib/authRateLimit';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -369,6 +370,7 @@ userSettingsRoutes.delete<{ id: string }>(
 userSettingsRoutes.post<{ username: string; password: string }>(
   '/linked-accounts/jellyfin',
   isOwnProfile(),
+  accountLinkLimiter,
   async (req, res) => {
     const settings = getSettings();
     const userRepository = getRepository(User);

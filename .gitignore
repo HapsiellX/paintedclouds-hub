@@ -6,6 +6,9 @@
 # testing
 /coverage
 lcov.info
+/report.xml
+/.pnpm-store/
+/cache/
 
 # next.js
 /.next/
