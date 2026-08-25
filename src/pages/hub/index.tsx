@@ -436,7 +436,10 @@ const HubPage: NextPage = () => {
                       <button
                         className="w-full rounded bg-indigo-600 px-3 py-2 font-medium text-white hover:bg-indigo-500"
                         onClick={() =>
-                          router.push(`/hub/${item.kind}/${item.externalId}`)
+                          router.push({
+                            pathname: `/hub/${item.kind}/${item.externalId}`,
+                            query: { provider: item.provider },
+                          })
                         }
                       >
                         {tr('Details & Wunsch', 'Details & request')}

@@ -24,6 +24,32 @@ const baseCacheDirectory = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/cache/images`
   : path.join(__dirname, '../../config/cache/images');
 
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_IMAGE_CONTENT_TYPES =
+  /^image\/(?:avif|gif|jpe?g|png|webp)(?:\s*;|$)/i;
+
+export const resolveAllowedImageUrl = ({
+  imagePath,
+  baseUrl,
+  allowedOrigins,
+}: {
+  imagePath: string;
+  baseUrl?: string;
+  allowedOrigins: ReadonlySet<string>;
+}): string => {
+  const imageUrl = baseUrl ? new URL(imagePath, baseUrl) : new URL(imagePath);
+
+  if (
+    imageUrl.username ||
+    imageUrl.password ||
+    !allowedOrigins.has(imageUrl.origin)
+  ) {
+    throw new Error('Image URL origin is not allowed');
+  }
+
+  return imageUrl.toString();
+};
+
 class ImageProxy {
   public static async clearCache(key: string) {
     let deletedImages = 0;
@@ -129,6 +155,8 @@ class ImageProxy {
   }
 
   private axios: AxiosInstance;
+  private allowedOrigins: ReadonlySet<string>;
+  private baseUrl?: string;
   private cacheVersion;
   private key;
 
@@ -139,13 +167,23 @@ class ImageProxy {
       cacheVersion?: number;
       rateLimitOptions?: rateLimitOptions;
       headers?: Record<string, string>;
+      allowedOrigins?: string[];
     } = {}
   ) {
     this.cacheVersion = options.cacheVersion ?? 1;
     this.key = key;
+    this.baseUrl = baseUrl || undefined;
+    this.allowedOrigins = new Set(
+      [
+        ...(this.baseUrl ? [this.baseUrl] : []),
+        ...(options.allowedOrigins ?? []),
+      ].map((url) => new URL(url).origin)
+    );
     this.axios = axios.create({
-      baseURL: baseUrl,
       headers: options.headers,
+      maxBodyLength: MAX_IMAGE_BYTES,
+      maxContentLength: MAX_IMAGE_BYTES,
+      timeout: 15_000,
     });
     this.axios.interceptors.request.use(requestInterceptorFunction);
 
@@ -258,18 +296,26 @@ class ImageProxy {
   }
 
   private async set(
-    path: string,
+    imagePath: string,
     cacheKey: string
   ): Promise<ImageResponse | null> {
     try {
       const directory = join(this.getCacheDirectory(), cacheKey);
-      const response = await this.axios.get(path, {
+      const requestUrl = resolveAllowedImageUrl({
+        imagePath,
+        baseUrl: this.baseUrl,
+        allowedOrigins: this.allowedOrigins,
+      });
+      const response = await this.axios.get(requestUrl, {
         responseType: 'arraybuffer',
       });
 
       const buffer = Buffer.from(response.data, 'binary');
 
       const contentType = String(response.headers['content-type'] ?? '');
+      if (!ALLOWED_IMAGE_CONTENT_TYPES.test(contentType)) {
+        throw new Error('Remote response is not a supported image type');
+      }
       const extension = mime.getExtension(contentType) || '';
 
       const cacheControl = String(response.headers['cache-control'] ?? '0');
@@ -277,7 +323,9 @@ class ImageProxy {
 
       if (!maxAge) maxAge = 86400;
       const expireAt = Date.now() + maxAge * 1000;
-      const etag = String(response.headers.etag ?? '').replace(/"/g, '');
+      const etag = createHash('sha256')
+        .update(String(response.headers.etag ?? ''))
+        .digest('hex');
 
       await this.writeToCacheDir(
         directory,

@@ -25,6 +25,10 @@ async function initAvatarImageProxy() {
     });
     const deviceId = admin?.jellyfinDeviceId || 'BOT_seerr';
     const authToken = getSettings().jellyfin.apiKey;
+    const jellyfinOrigin = new URL(getHostname()).origin;
+    const gravatarOrigin = new URL(
+      gravatarUrl('none', { default: 'mm', size: 200 })
+    ).origin;
     _avatarImageProxy = new ImageProxy('avatar', '', {
       headers: {
         'X-Emby-Authorization': `MediaBrowser Client="StefARR", Device="StefARR", DeviceId="${deviceId}", Version="${
@@ -33,6 +37,7 @@ async function initAvatarImageProxy() {
             : getAppVersion()
         }", Token="${authToken}"`,
       },
+      allowedOrigins: [jellyfinOrigin, gravatarOrigin],
     });
   }
   return _avatarImageProxy;

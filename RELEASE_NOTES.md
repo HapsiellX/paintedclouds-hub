@@ -1,4 +1,31 @@
-# V0.8.0-beta.6 operator notes
+# V0.8.0-beta.7 operator notes
+
+This beta publishes the current Forgejo catalog improvements. Book and
+audiobook discovery can use the academic-catalog fallback when the primary
+metadata sources return no useful result, and partial catalog searches now
+retry transient provider failures instead of silently returning an incomplete
+shelf.
+
+Authentication and remote-image handling are hardened. Login, password-reset,
+and media-account-link attempts have bounded rate limits. Jellyfin sign-in
+requires both credential fields before contacting the configured server. The
+image proxy now accepts only explicitly allowed origins, rejects embedded
+credentials and origin overrides, enforces a 15-second timeout and 25 MiB
+response limit, and caches only supported raster image formats. The anime
+mapping refresh no longer performs a separate existence check before reading
+file metadata, and mobile settings navigation verifies every selected route
+against the configured tab list.
+
+Patch updates include React 19.2.8, Sharp 0.35.3, Nodemailer 9.0.5, OpenPGP
+6.3.1, FormatJS, Autoprefixer, and matching development types and tools. The
+production dependency audit reports no known vulnerabilities. The Cypress-only
+`extract-zip` advisory and the documentation-only `image-size` advisories have
+no patched upstream release as of this beta and are not present in the runtime
+dependency audit or production image path.
+
+No application API or database schema changes are included in Beta 7.
+
+## Previous Beta 6 changes
 
 This security beta resolves the August 2026 dependency advisories reported by
 GitHub and Trivy. Direct runtime updates include Next.js 16.2.11, Undici 8.9.0,
@@ -55,9 +82,9 @@ regression check for resolved upgrade failures and future episodes.
 ## Supported upgrade and rollback
 
 - The supported direct upgrade paths are **V0.7.0 and every earlier
-  V0.8.0 beta through V0.8.0-beta.5 to V0.8.0-beta.6** on SQLite and
+  V0.8.0 beta through V0.8.0-beta.6 to V0.8.0-beta.7** on SQLite and
   PostgreSQL.
-- V0.8.0-beta.6 includes the nullable torrent-fallback state introduced in
+- V0.8.0-beta.7 includes the nullable torrent-fallback state introduced in
   Beta 3 and requires no additional database migration from Beta 5.
   Back up the complete configuration directory and database before upgrading.
 - Database downgrade is not supported. Rollback requires restoring the image

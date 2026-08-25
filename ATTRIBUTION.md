@@ -56,6 +56,15 @@ existing rights can remain in contributions and jurisdictions. See its
 metadata contact is sent as Open Library's `email` request parameter for an
 identified client.
 
+### lobid
+
+Additional bibliographic metadata and catalog links are supplied by
+[lobid](https://lobid.org/), the Linked Open Data service operated by the hbz.
+The integration uses the public
+[resources API](https://lobid.org/resources/api). Rights in linked catalog
+records and digital objects remain subject to their respective notices; a
+catalog match is not permission to download or redistribute a work.
+
 ### TMDB
 
 Movie and television discovery inherited from Seerr uses
@@ -66,8 +75,8 @@ attribution and branding required by the current TMDB API terms.
 ## Integrated Products
 
 Names including Jellyfin, Plex, Emby, Sonarr, Radarr, Lidarr, LazyLibrarian,
-Prowlarr, SABnzbd, Home Assistant, MusicBrainz, Open Library, Internet Archive,
-TMDB, Overseerr, Jellyseerr, and Seerr belong to their respective owners. Their
+Prowlarr, SABnzbd, Home Assistant, MusicBrainz, Open Library, lobid, hbz,
+Internet Archive, TMDB, Overseerr, Jellyseerr, and Seerr belong to their respective owners. Their
 mention describes compatibility and does not imply sponsorship, certification,
 or partnership.
 

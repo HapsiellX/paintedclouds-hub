@@ -190,7 +190,7 @@ class AnimeListMapping {
     this.syncing = true;
     try {
       // check if local file is not "expired" yet
-      if (fs.existsSync(LOCAL_PATH)) {
+      try {
         const now = new Date();
         const stat = await fsp.stat(LOCAL_PATH);
         if (now.getTime() - stat.mtime.getTime() < UPDATE_INTERVAL_MSEC) {
@@ -205,6 +205,10 @@ class AnimeListMapping {
             await this.loadFromFile();
           }
           return;
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
         }
       }
       await this.downloadFile();

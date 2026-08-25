@@ -76,6 +76,19 @@ const SettingsTabs = ({
 }) => {
   const router = useRouter();
   const { user: currentUser } = useUser();
+  const navigateToSelectedTab = (route: string) => {
+    const selectedRoute = settingsRoutes.find(
+      (settingsRoute) => settingsRoute.route === route
+    );
+    if (
+      selectedRoute &&
+      /^\/(?:settings|profile|users)(?:\/[a-z0-9_-]+)*$/i.test(
+        selectedRoute.route
+      )
+    ) {
+      router.push(selectedRoute.route);
+    }
+  };
 
   return (
     <>
@@ -86,10 +99,10 @@ const SettingsTabs = ({
         <select
           id="tabs"
           onChange={(e) => {
-            router.push(e.target.value);
+            navigateToSelectedTab(e.target.value);
           }}
           onBlur={(e) => {
-            router.push(e.target.value);
+            navigateToSelectedTab(e.target.value);
           }}
           defaultValue={
             settingsRoutes.find((route) => !!router.pathname.match(route.regex))

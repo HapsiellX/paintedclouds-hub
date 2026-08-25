@@ -8,7 +8,7 @@ import useSWR, { mutate } from 'swr';
 type DetailKind = 'music_artist' | 'music_album' | 'book';
 interface CatalogItem {
   kind: DetailKind;
-  provider: 'musicbrainz' | 'openlibrary';
+  provider: 'musicbrainz' | 'openlibrary' | 'lobid';
   externalId: string;
   title: string;
   subtitle?: string;
@@ -27,6 +27,11 @@ interface Edition {
 interface Detail extends CatalogItem {
   related: CatalogItem[];
   editions: Edition[];
+  accessOptions?: {
+    kind: 'catalog' | 'online';
+    label: string;
+    url: string;
+  }[];
 }
 
 const HubDetailPage: NextPage = () => {
@@ -47,7 +52,15 @@ const HubDetailPage: NextPage = () => {
   const validKind = ['music_artist', 'music_album', 'book'].includes(kind ?? '')
     ? (kind as DetailKind)
     : undefined;
-  const provider = validKind === 'book' ? 'openlibrary' : 'musicbrainz';
+  const requestedProvider = Array.isArray(router.query.provider)
+    ? router.query.provider[0]
+    : router.query.provider;
+  const provider =
+    validKind === 'book' && requestedProvider === 'lobid'
+      ? 'lobid'
+      : validKind === 'book'
+        ? 'openlibrary'
+        : 'musicbrainz';
   const url =
     validKind && id
       ? `/api/v1/hub/items/${validKind}/${provider}/${encodeURIComponent(id)}`
@@ -164,6 +177,33 @@ const HubDetailPage: NextPage = () => {
               <p className="mt-5 max-w-3xl text-gray-300">{data.description}</p>
             )}
 
+            {data.kind === 'book' && !!data.accessOptions?.length && (
+              <div className="mt-5 rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-4">
+                <p className="font-semibold text-emerald-200">
+                  {tr('Legale Zugangswege', 'Legal access options')}
+                </p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {tr(
+                    'Bibliotheksnachweise, Fernleihe und autorisierte Vorschauen für schwer auffindbare Fachbücher.',
+                    'Library records, interlibrary loan, and authorized previews for hard-to-find academic books.'
+                  )}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {data.accessOptions.map((option) => (
+                    <a
+                      key={`${option.kind}-${option.url}`}
+                      href={option.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-md border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-900/50"
+                    >
+                      {option.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {data.kind === 'book' && (
               <div className="mt-6 space-y-4">
                 {data.editions.length ? (
@@ -260,7 +300,10 @@ const HubDetailPage: NextPage = () => {
                 key={item.externalId}
                 type="button"
                 onClick={() =>
-                  router.push(`/hub/${item.kind}/${item.externalId}`)
+                  router.push({
+                    pathname: `/hub/${item.kind}/${item.externalId}`,
+                    query: { provider: item.provider },
+                  })
                 }
                 className="rounded-lg border border-gray-700 bg-gray-900/60 p-4 text-left hover:border-indigo-500"
               >

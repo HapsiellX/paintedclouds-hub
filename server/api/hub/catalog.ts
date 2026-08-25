@@ -11,7 +11,7 @@ import rateLimit from 'axios-rate-limit';
 
 export interface HubCatalogItem {
   kind: HubMediaKind;
-  provider: 'tmdb' | 'musicbrainz' | 'openlibrary';
+  provider: 'tmdb' | 'musicbrainz' | 'openlibrary' | 'lobid';
   externalId: string;
   title: string;
   subtitle?: string;
@@ -52,6 +52,13 @@ export interface HubCatalogEdition {
 export interface HubCatalogDetail extends HubCatalogItem {
   related: HubCatalogItem[];
   editions: HubCatalogEdition[];
+  accessOptions?: HubCatalogAccessOption[];
+}
+
+export interface HubCatalogAccessOption {
+  kind: 'catalog' | 'online';
+  label: string;
+  url: string;
 }
 
 interface MusicBrainzArtistResponse {
@@ -129,9 +136,30 @@ interface OpenLibraryAuthorDetail {
   name?: string;
 }
 
+interface LobidResource {
+  id?: string;
+  title?: string;
+  responsibilityStatement?: string[];
+  contribution?: { agent?: { label?: string } }[];
+  publication?: {
+    startDate?: string;
+    dateStatement?: string;
+    publishedBy?: string[];
+  }[];
+  isbn?: string[];
+  language?: { id?: string; label?: string }[];
+  type?: string[];
+  fulltextOnline?: { id?: string; label?: string }[];
+}
+
+interface LobidResponse {
+  member?: LobidResource[];
+}
+
 interface HubCatalogClients {
   musicBrainz: Pick<AxiosInstance, 'get'>;
   openLibrary: Pick<AxiosInstance, 'get'>;
+  lobid: Pick<AxiosInstance, 'get'>;
 }
 
 export class HubCatalogItemNotFoundError extends Error {}
@@ -169,6 +197,18 @@ const openLibrary = rateLimit(
   { maxRequests: 3, perMilliseconds: 1_000 }
 );
 
+const lobid = rateLimit(
+  axios.create({
+    baseURL: 'https://lobid.org/resources',
+    timeout: 10_000,
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'PaintedCloudsHub/0.8',
+    },
+  }),
+  { maxRequests: 3, perMilliseconds: 1_000 }
+);
+
 musicBrainz.interceptors.request.use((config) => {
   config.headers.set('User-Agent', metadataIdentity().userAgent);
   return config;
@@ -180,6 +220,10 @@ openLibrary.interceptors.request.use((config) => {
     ...(typeof config.params === 'object' ? config.params : {}),
     ...(identity.contactEmail ? { email: identity.contactEmail } : {}),
   };
+  return config;
+});
+lobid.interceptors.request.use((config) => {
+  config.headers.set('User-Agent', metadataIdentity().userAgent);
   return config;
 });
 
@@ -259,27 +303,158 @@ const searchMusic = async (query: string): Promise<HubCatalogItem[]> => {
   ];
 };
 
-const searchBooks = async (query: string): Promise<HubCatalogItem[]> => {
-  const response = await openLibrary.get<OpenLibraryResponse>('/search.json', {
-    params: {
-      q: query,
-      limit: 20,
-      fields: 'key,title,author_name,first_publish_year,cover_i,language',
-    },
-  });
+const lobidExternalId = (resource: LobidResource): string | undefined =>
+  resource.id?.match(/^https?:\/\/lobid\.org\/resources\/(\d+)#!$/)?.[1];
 
-  return (response.data.docs ?? []).map((book) => ({
+const lobidLanguages = (resource: LobidResource): string[] | undefined => {
+  const languages = (resource.language ?? []).flatMap((language) => {
+    const code = language.id?.match(/\/iso639-2\/([a-z]{3})$/i)?.[1];
+    return code ? [code.toLowerCase()] : [];
+  });
+  return languages.length ? [...new Set(languages)] : undefined;
+};
+
+const mapLobidResource = (
+  resource: LobidResource
+): HubCatalogItem | undefined => {
+  const externalId = lobidExternalId(resource);
+  if (!externalId || !resource.title || !resource.type?.includes('Book'))
+    return undefined;
+  const publication = resource.publication?.[0];
+  const year = Number(
+    publication?.startDate ?? publication?.dateStatement?.match(/\d{4}/)?.[0]
+  );
+  const contributors = (resource.contribution ?? [])
+    .flatMap((entry) => (entry.agent?.label ? [entry.agent.label] : []))
+    .slice(0, 5);
+  return {
     kind: HubMediaKind.BOOK,
-    provider: 'openlibrary' as const,
-    externalId: book.key.replace('/works/', ''),
-    title: book.title,
-    subtitle: (book.author_name ?? []).join(', '),
-    imageUrl: book.cover_i
-      ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg`
-      : undefined,
-    year: book.first_publish_year,
-    languages: book.language,
-  }));
+    provider: 'lobid',
+    externalId,
+    title: resource.title,
+    subtitle: (resource.responsibilityStatement ?? contributors).join(', '),
+    year: Number.isInteger(year) && year > 0 ? year : undefined,
+    languages: lobidLanguages(resource),
+    formats: ['ebook', 'audiobook'],
+  };
+};
+
+const normalizedBookKey = (item: HubCatalogItem) =>
+  `${item.title
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/gi, '')
+    .toLowerCase()}:${item.year ?? ''}`;
+
+const bookSearchStopWords = new Set([
+  'and',
+  'das',
+  'der',
+  'des',
+  'die',
+  'für',
+  'im',
+  'in',
+  'mit',
+  'of',
+  'the',
+  'und',
+  'von',
+  'zum',
+  'zur',
+]);
+
+const searchableWords = (value: string) => [
+  ...new Set(
+    (value.toLocaleLowerCase('de').match(/[\p{L}\p{N}]+/gu) ?? []).filter(
+      (word) => word.length >= 3 && !bookSearchStopWords.has(word)
+    )
+  ),
+];
+
+export const rankRelevantBookResults = (
+  query: string,
+  books: HubCatalogItem[]
+): HubCatalogItem[] => {
+  const queryWords = searchableWords(query);
+  if (!queryWords.length) return books;
+  return books
+    .map((book, position) => {
+      const candidateWords = new Set(
+        searchableWords(`${book.title} ${book.subtitle ?? ''}`)
+      );
+      const matches = queryWords.filter((word) => candidateWords.has(word));
+      return {
+        book,
+        position,
+        score: matches.length / queryWords.length,
+      };
+    })
+    .filter(({ score }) => score >= (queryWords.length <= 2 ? 0.5 : 0.35))
+    .sort(
+      (left, right) =>
+        right.score - left.score || left.position - right.position
+    )
+    .map(({ book }) => book);
+};
+
+const searchBooks = async (query: string): Promise<HubCatalogItem[]> => {
+  const [openLibraryResponse, lobidResponse] = await Promise.allSettled([
+    providerCall('openlibrary', () =>
+      openLibrary.get<OpenLibraryResponse>('/search.json', {
+        params: {
+          q: query,
+          limit: 20,
+          fields: 'key,title,author_name,first_publish_year,cover_i,language',
+        },
+      })
+    ),
+    providerCall('lobid', () =>
+      lobid.get<LobidResponse>('/search', {
+        params: { q: query.replace(/["\\]/g, ' ').trim(), size: 20 },
+      })
+    ),
+  ]);
+  if (
+    openLibraryResponse.status === 'rejected' &&
+    lobidResponse.status === 'rejected'
+  )
+    throw new Error('BOOK_METADATA_PROVIDERS_UNAVAILABLE');
+
+  const openLibraryBooks =
+    openLibraryResponse.status === 'fulfilled'
+      ? (openLibraryResponse.value.data.docs ?? []).map((book) => ({
+          kind: HubMediaKind.BOOK,
+          provider: 'openlibrary' as const,
+          externalId: book.key.replace('/works/', ''),
+          title: book.title,
+          subtitle: (book.author_name ?? []).join(', '),
+          imageUrl: book.cover_i
+            ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg`
+            : undefined,
+          year: book.first_publish_year,
+          languages: book.language,
+        }))
+      : [];
+  const lobidBooks =
+    lobidResponse.status === 'fulfilled'
+      ? rankRelevantBookResults(
+          query,
+          (lobidResponse.value.data.member ?? []).flatMap((resource) => {
+            const item = mapLobidResource(resource);
+            return item ? [item] : [];
+          })
+        )
+      : [];
+  const seen = new Set(openLibraryBooks.map(normalizedBookKey));
+  return [
+    ...openLibraryBooks,
+    ...lobidBooks.filter((book) => {
+      const key = normalizedBookKey(book);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }),
+  ].slice(0, 30);
 };
 
 const mapReleaseGroups = (
@@ -627,12 +802,12 @@ interface ProviderRuntimeState {
 }
 
 const providerRuntime = new Map<
-  'tmdb' | 'musicbrainz' | 'openlibrary',
+  'tmdb' | 'musicbrainz' | 'openlibrary' | 'lobid',
   ProviderRuntimeState
 >();
 
 const providerCall = async <T>(
-  provider: 'tmdb' | 'musicbrainz' | 'openlibrary',
+  provider: 'tmdb' | 'musicbrainz' | 'openlibrary' | 'lobid',
   load: () => Promise<T>
 ): Promise<T> => {
   const state = providerRuntime.get(provider) ?? {
@@ -661,7 +836,7 @@ const providerCall = async <T>(
 };
 
 export const getHubProviderHealth = () =>
-  (['tmdb', 'musicbrainz', 'openlibrary'] as const).map((provider) => {
+  (['tmdb', 'musicbrainz', 'openlibrary', 'lobid'] as const).map((provider) => {
     const state = providerRuntime.get(provider);
     return {
       provider,
@@ -947,10 +1122,10 @@ const resolveOpenLibraryAuthors = async (
 export const resolveHubCatalogItem = async (
   input: {
     kind: HubMediaKind;
-    provider: 'musicbrainz' | 'openlibrary';
+    provider: 'musicbrainz' | 'openlibrary' | 'lobid';
     externalId: string;
   },
-  clients: HubCatalogClients = { musicBrainz, openLibrary }
+  clients: HubCatalogClients = { musicBrainz, openLibrary, lobid }
 ): Promise<HubCatalogItem> => {
   const musicId =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -961,7 +1136,10 @@ export const resolveHubCatalogItem = async (
       musicId.test(input.externalId)) ||
     (input.provider === 'openlibrary' &&
       input.kind === HubMediaKind.BOOK &&
-      /^OL\d+W$/i.test(input.externalId));
+      /^OL\d+W$/i.test(input.externalId)) ||
+    (input.provider === 'lobid' &&
+      input.kind === HubMediaKind.BOOK &&
+      /^\d{12,20}$/.test(input.externalId));
   if (!validIdentity) throw new HubCatalogItemNotFoundError();
 
   try {
@@ -1058,6 +1236,16 @@ export const resolveHubCatalogItem = async (
       };
     }
 
+    if (input.provider === 'lobid' && input.kind === HubMediaKind.BOOK) {
+      const response = await clients.lobid.get<LobidResource>(
+        `/${encodeURIComponent(input.externalId)}.json`
+      );
+      const item = mapLobidResource(response.data);
+      if (!item || item.externalId !== input.externalId)
+        throw new HubCatalogItemNotFoundError();
+      return item;
+    }
+
     throw new HubCatalogItemNotFoundError();
   } catch (error) {
     if (
@@ -1087,6 +1275,55 @@ export const resolveHubCatalogDetail = async (
   }
   if (input.kind === HubMediaKind.MUSIC_ALBUM) {
     return { ...item, related: [], editions: [] };
+  }
+  const legalSearchOptions = (book: HubCatalogItem) => {
+    const query = encodeURIComponent(
+      [book.title, book.subtitle].filter(Boolean).join(' ')
+    );
+    const options: HubCatalogAccessOption[] = [
+      {
+        kind: 'catalog',
+        label: 'WorldCat / Fernleihe',
+        url: `https://search.worldcat.org/search?q=${query}`,
+      },
+      {
+        kind: 'catalog',
+        label: 'Google Books',
+        url: `https://books.google.com/books?q=${query}`,
+      },
+    ];
+    if (book.provider === 'lobid')
+      options.unshift({
+        kind: 'catalog',
+        label: 'lobid Bibliotheksnachweis',
+        url: `https://lobid.org/resources/${book.externalId}`,
+      });
+    return options;
+  };
+  if (input.provider === 'lobid') {
+    const response = await lobid.get<LobidResource>(
+      `/${encodeURIComponent(item.externalId)}.json`
+    );
+    const publication = response.data.publication?.[0];
+    const isbn = (response.data.isbn ?? []).filter((value) =>
+      /^(?:\d{10}|\d{13})$/.test(value)
+    );
+    return {
+      ...item,
+      related: [],
+      editions: [
+        {
+          id: `LOBID-${item.externalId}`,
+          title: item.title,
+          languages: item.languages ?? [],
+          isbn,
+          publishDate:
+            publication?.startDate ?? publication?.dateStatement ?? undefined,
+          publishers: publication?.publishedBy ?? [],
+        },
+      ],
+      accessOptions: legalSearchOptions(item),
+    };
   }
   const response = await openLibrary.get<{
     entries?: {
@@ -1121,5 +1358,10 @@ export const resolveHubCatalogDetail = async (
       },
     ];
   });
-  return { ...item, related: [], editions };
+  return {
+    ...item,
+    related: [],
+    editions,
+    accessOptions: legalSearchOptions(item),
+  };
 };

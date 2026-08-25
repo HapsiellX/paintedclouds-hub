@@ -6,6 +6,7 @@ export const withHubMetadataCache = async <T>(
   cacheKey: string,
   load: () => Promise<T>,
   ttlMs = 24 * 60 * 60 * 1000,
+  shouldCache: (value: T) => boolean = () => true,
   staleMs = 7 * 24 * 60 * 60 * 1000
 ): Promise<T> => {
   const repository = getRepository(HubMetadataCache);
@@ -14,6 +15,7 @@ export const withHubMetadataCache = async <T>(
   if (cached && cached.expiresAt > now) return JSON.parse(cached.payload) as T;
   try {
     const value = await load();
+    if (!shouldCache(value)) return value;
     await repository.save({
       ...(cached ?? {}),
       provider,

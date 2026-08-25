@@ -44,6 +44,7 @@ An instance may communicate with:
 - MusicBrainz for artist and release metadata;
 - Cover Art Archive for album artwork;
 - Open Library and its cover service for book metadata and artwork;
+- lobid for bibliographic metadata and library catalog links;
 - the operator's Jellyfin, Plex, or Emby server for authentication and library
   information;
 - the operator's Sonarr, Radarr, Lidarr, LazyLibrarian, Prowlarr, SABnzbd, and
@@ -61,7 +62,8 @@ provider.
 The metadata contact address configured in the Hub Admin UI is deliberately
 transmitted as a contact identifier: it is included in the MusicBrainz
 User-Agent and sent to Open Library as the `email` request parameter. A custom
-User-Agent may itself contain contact information. Operators should use a
+User-Agent is also sent to lobid and may itself contain contact information.
+Operators should use a
 monitored, role-based public address rather than a person's private address,
 inform affected administrators, and understand that providers can retain these
 values under their own policies.

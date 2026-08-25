@@ -6,6 +6,11 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
+import {
+  authLoginLimiter,
+  passwordResetConfirmLimiter,
+  passwordResetRequestLimiter,
+} from '@server/lib/authRateLimit';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -46,7 +51,7 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
   return res.status(200).json(user);
 });
 
-authRoutes.post('/plex', async (req, res, next) => {
+authRoutes.post('/plex', authLoginLimiter, async (req, res, next) => {
   const settings = getSettings();
   const userRepository = getRepository(User);
   const body = req.body as { authToken?: string };
@@ -223,7 +228,7 @@ function getUserAvatarUrl(user: User): string {
   return `/avatarproxy/${user.jellyfinUserId}?v=${user.avatarVersion}`;
 }
 
-authRoutes.post('/jellyfin', async (req, res, next) => {
+authRoutes.post('/jellyfin', authLoginLimiter, async (req, res, next) => {
   const settings = getSettings();
   const userRepository = getRepository(User);
   const body = req.body as {
@@ -249,8 +254,10 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
     return res.status(500).json({ error: 'Jellyfin login is disabled' });
   }
 
-  if (!body.username) {
-    return res.status(500).json({ error: 'You must provide an username' });
+  if (!body.username || !body.password) {
+    return res
+      .status(400)
+      .json({ error: 'You must provide a username and password.' });
   } else if (settings.jellyfin.ip !== '' && body.hostname) {
     return res
       .status(500)
@@ -593,7 +600,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
   }
 });
 
-authRoutes.post('/local', async (req, res, next) => {
+authRoutes.post('/local', authLoginLimiter, async (req, res, next) => {
   const settings = getSettings();
   const userRepository = getRepository(User);
   const body = req.body as { email?: string; password?: string };
@@ -722,98 +729,106 @@ authRoutes.post('/logout', async (req, res, next) => {
   }
 });
 
-authRoutes.post('/reset-password', async (req, res, next) => {
-  const userRepository = getRepository(User);
-  const body = req.body as { email?: string };
+authRoutes.post(
+  '/reset-password',
+  passwordResetRequestLimiter,
+  async (req, res, next) => {
+    const userRepository = getRepository(User);
+    const body = req.body as { email?: string };
 
-  if (!body.email) {
-    return next({
-      status: 500,
-      message: 'Email address required.',
-    });
+    if (!body.email) {
+      return next({
+        status: 500,
+        message: 'Email address required.',
+      });
+    }
+
+    const user = await userRepository
+      .createQueryBuilder('user')
+      .where('user.email = :email', { email: body.email.toLowerCase() })
+      .getOne();
+
+    if (user) {
+      await user.resetPassword();
+      await userRepository.save(user);
+      logger.info('Successfully sent password reset link', {
+        label: 'API',
+        ip: req.ip,
+        email: body.email,
+      });
+    } else {
+      logger.error('Something went wrong sending password reset link', {
+        label: 'API',
+        ip: req.ip,
+        email: body.email,
+      });
+    }
+
+    return res.status(200).json({ status: 'ok' });
   }
+);
 
-  const user = await userRepository
-    .createQueryBuilder('user')
-    .where('user.email = :email', { email: body.email.toLowerCase() })
-    .getOne();
+authRoutes.post<{ guid: string }>(
+  '/reset-password/:guid',
+  passwordResetConfirmLimiter,
+  async (req, res, next) => {
+    const userRepository = getRepository(User);
 
-  if (user) {
-    await user.resetPassword();
+    if (!req.body.password || req.body.password?.length < 8) {
+      logger.warn('Failed password reset attempt using invalid new password', {
+        label: 'API',
+        ip: req.ip,
+        guid: req.params.guid,
+      });
+      return next({
+        status: 500,
+        message: 'Password must be at least 8 characters long.',
+      });
+    }
+
+    const user = await userRepository.findOne({
+      where: { resetPasswordGuid: req.params.guid },
+    });
+
+    if (!user) {
+      logger.warn('Failed password reset attempt using invalid recovery link', {
+        label: 'API',
+        ip: req.ip,
+        guid: req.params.guid,
+      });
+      return next({
+        status: 500,
+        message: 'Invalid password reset link.',
+      });
+    }
+
+    if (
+      !user.recoveryLinkExpirationDate ||
+      user.recoveryLinkExpirationDate <= new Date()
+    ) {
+      logger.warn('Failed password reset attempt using expired recovery link', {
+        label: 'API',
+        ip: req.ip,
+        guid: req.params.guid,
+        email: user.email,
+      });
+      return next({
+        status: 500,
+        message: 'Invalid password reset link.',
+      });
+    }
+    user.recoveryLinkExpirationDate = null;
+    await user.setPassword(req.body.password);
     await userRepository.save(user);
-    logger.info('Successfully sent password reset link', {
-      label: 'API',
-      ip: req.ip,
-      email: body.email,
-    });
-  } else {
-    logger.error('Something went wrong sending password reset link', {
-      label: 'API',
-      ip: req.ip,
-      email: body.email,
-    });
-  }
-
-  return res.status(200).json({ status: 'ok' });
-});
-
-authRoutes.post('/reset-password/:guid', async (req, res, next) => {
-  const userRepository = getRepository(User);
-
-  if (!req.body.password || req.body.password?.length < 8) {
-    logger.warn('Failed password reset attempt using invalid new password', {
-      label: 'API',
-      ip: req.ip,
-      guid: req.params.guid,
-    });
-    return next({
-      status: 500,
-      message: 'Password must be at least 8 characters long.',
-    });
-  }
-
-  const user = await userRepository.findOne({
-    where: { resetPasswordGuid: req.params.guid },
-  });
-
-  if (!user) {
-    logger.warn('Failed password reset attempt using invalid recovery link', {
-      label: 'API',
-      ip: req.ip,
-      guid: req.params.guid,
-    });
-    return next({
-      status: 500,
-      message: 'Invalid password reset link.',
-    });
-  }
-
-  if (
-    !user.recoveryLinkExpirationDate ||
-    user.recoveryLinkExpirationDate <= new Date()
-  ) {
-    logger.warn('Failed password reset attempt using expired recovery link', {
+    logger.info('Successfully reset password', {
       label: 'API',
       ip: req.ip,
       guid: req.params.guid,
       email: user.email,
     });
-    return next({
-      status: 500,
-      message: 'Invalid password reset link.',
-    });
-  }
-  user.recoveryLinkExpirationDate = null;
-  await user.setPassword(req.body.password);
-  await userRepository.save(user);
-  logger.info('Successfully reset password', {
-    label: 'API',
-    ip: req.ip,
-    guid: req.params.guid,
-    email: user.email,
-  });
 
-  return res.status(200).json({ status: 'ok' });
-});
+    return res.status(200).json({ status: 'ok' });
+  }
+);
 
 export default authRoutes;

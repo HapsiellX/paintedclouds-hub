@@ -39,7 +39,7 @@ interface UnifiedRequest {
   source: RequestSource;
   sourceId: number;
   kind: RequestKind;
-  provider: 'tmdb' | 'musicbrainz' | 'openlibrary';
+  provider: 'tmdb' | 'musicbrainz' | 'openlibrary' | 'lobid';
   externalId: string;
   title: string;
   subtitle?: string;
