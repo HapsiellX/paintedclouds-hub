@@ -40,7 +40,7 @@ RUN \
   'linux/arm64' | 'linux/arm/v7') \
   apk update && \
   apk add --no-cache \
-  python3=3.12.13-r0 \
+  python3=3.12.14-r0 \
   make=4.4.1-r3 \
   g++=15.2.0-r2 \
   gcc=15.2.0-r2 \
